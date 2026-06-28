@@ -65,4 +65,53 @@ function calculateBaseScore(progress) {
   return breakdown;
 }
 
+const TIER_CONFIG = [
+  { name: 'Starter', min: 0, max: 39, color: '#9CA3AF', next: 'Builder' },
+  { name: 'Builder', min: 40, max: 69, color: '#D97706', next: 'Trusted' },
+  { name: 'Trusted', min: 70, max: 100, color: '#16A34A', next: null },
+];
+
+function getTierInfo(score) {
+  const tier = TIER_CONFIG.find(t => score >= t.min && score <= t.max) || TIER_CONFIG[0];
+  const pointsToNext = tier.next ? (TIER_CONFIG.find(t => t.name === tier.next).min - score) : 0;
+  return {
+    name: tier.name,
+    color: tier.color,
+    next: tier.next,
+    points_to_next: pointsToNext > 0 ? pointsToNext : 0,
+  };
+}
+
+function getFeatureGates(score) {
+  const gates = [
+    { feature: 'join_public_groups', required_score: 30 },
+    { feature: 'create_group', required_score: 0 },
+    { feature: 'savings_goals', required_score: 0 },
+    { feature: 'escrow', required_score: 0 },
+    { feature: 'increase_group_limit', required_score: 60 },
+    { feature: 'priority_support', required_score: 70 },
+  ];
+
+  const unlocked = [];
+  const locked = [];
+
+  gates.forEach(gate => {
+    if (score >= gate.required_score) {
+      unlocked.push(gate.feature);
+    } else {
+      locked.push({
+        feature: gate.feature,
+        required_score: gate.required_score,
+        current_score: score,
+        unlocked: false,
+        points_needed: gate.required_score - score,
+      });
+    }
+  });
+
+  return { unlocked, locked };
+}
+
+module.exports = { calculateBaseScore, getTierInfo, getFeatureGates };
+
 module.exports = { calculateBaseScore };
