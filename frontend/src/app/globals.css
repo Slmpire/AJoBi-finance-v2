@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-inter);
+  --color-ajobi-green: #006C49;
+  --color-ajobi-green-dark: #10B981;
+  --color-ajobi-light: #E6F5F0;
+  --color-ajobi-bg: #F7FBF9;
+}
+
+body {
+  background-color: var(--color-ajobi-bg);
+}
