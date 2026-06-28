@@ -31,6 +31,7 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/ajoscore', scoreRoutes);
+app.use('/api/score', scoreRoutes);
 app.use('/api/setup', setupRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/groups', groupRoutes);
