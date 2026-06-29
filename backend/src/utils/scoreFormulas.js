@@ -114,4 +114,3 @@ function getFeatureGates(score) {
 
 module.exports = { calculateBaseScore, getTierInfo, getFeatureGates };
 
-module.exports = { calculateBaseScore };
