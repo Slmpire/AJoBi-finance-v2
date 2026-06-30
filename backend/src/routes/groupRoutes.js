@@ -9,8 +9,11 @@ const {
   getGroupMembers,
   getGroupPayments,
   setupDebit,
+  listBankCodes
 } = require('../controllers/groupController');
 
+
+router.get('/banks', auth, listBankCodes);
 router.post('/create', auth, createGroup);
 router.post('/join', auth, joinGroup);
 router.get('/mine', auth, getMyGroups);
