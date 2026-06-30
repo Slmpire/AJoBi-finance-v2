@@ -25,7 +25,7 @@ async function getAccessToken() {
     }
   );
 
-  const { access_token, expiresAt } = response.data;
+  const { access_token, expiresAt } = response.data.data;
 
   cachedToken = access_token;
   // Refresh 2 minutes early to avoid edge-of-expiry failures
