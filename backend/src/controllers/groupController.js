@@ -284,6 +284,15 @@ async function setupDebit(req, res, next) {
   }
 }
 
+async function listBankCodes(req, res, next) {
+  try {
+    const BANK_CODES = require('../utils/bankCodes');
+    return success(res, BANK_CODES, 'Bank codes fetched successfully');
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   createGroup,
   joinGroup,
@@ -292,4 +301,5 @@ module.exports = {
   getGroupMembers,
   getGroupPayments,
   setupDebit,
+  listBankCodes,
 };
