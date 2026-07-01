@@ -7,10 +7,19 @@ const {
   getMyGoals,
   getGoalById,
   breakGoal,
+  getOverview,
+  getActivity,
+  getAutomationRules,
 } = require('../controllers/savingsController');
 
-router.post('/create', auth, createGoal);
+// Named routes MUST come before /:id
+router.get('/overview', auth, getOverview);
 router.get('/mine', auth, getMyGoals);
+router.get('/activity', auth, getActivity);
+router.get('/automation-rules', auth, getAutomationRules);
+router.post('/create', auth, createGoal);
+
+// Parameterised routes after
 router.get('/:id', auth, getGoalById);
 router.post('/:id/setup-payment', auth, setupGoalPayment);
 router.post('/:id/break', auth, breakGoal);
