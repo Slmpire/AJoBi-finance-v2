@@ -1,7 +1,7 @@
 import { apiClient } from './apiClient';
 
 export interface SetupProgressResponse {
-  success: boolean;
+  status: boolean;
   data: {
     steps_completed: number[];
     current_step: number;
@@ -10,7 +10,7 @@ export interface SetupProgressResponse {
 }
 
 export interface SetupStepResponse {
-  success: boolean;
+  status: boolean;
   data: {
     step_completed: number;
     next_step: number;
@@ -18,7 +18,7 @@ export interface SetupStepResponse {
 }
 
 export interface SetupFinalResponse {
-  success: boolean;
+  status: boolean;
   data: {
     onboarding_complete: boolean;
     ajo_score: number;
@@ -37,23 +37,50 @@ export interface SetupFinalResponse {
 }
 
 export const setupService = {
-  getProgress: async (email: string): Promise<SetupProgressResponse> => {
-    return { success: true, data: { steps_completed: [1, 2, 3], current_step: 4, onboarding_complete: false } };
-  },
-  submitStep1: async (data: { occupation: string, email: string }): Promise<SetupStepResponse> => {
-    return { success: true, data: { step_completed: 1, next_step: 2 } };
-  },
-  submitStep2: async (data: { trade_duration: string; state: string; lga: string; income_range: string, email: string }): Promise<SetupStepResponse> => {
-    return { success: true, data: { step_completed: 2, next_step: 3 } };
-  },
-  submitStep3: async (data: { saves_money: boolean; savings_methods: string[]; in_ajo_group: boolean; contribution_consistency: string, email: string }): Promise<SetupStepResponse> => {
-    return { success: true, data: { step_completed: 3, next_step: 4 } };
-  },
-  submitStep4: async (data: { has_borrowed: boolean; repaid_fully: boolean; repaid_on_time: boolean, email: string }): Promise<SetupStepResponse> => {
-    return { success: true, data: { step_completed: 4, next_step: 5 } };
-  },
-  submitStep5: async (data: { language: string; profile_photo: File | null | string, email: string }): Promise<SetupFinalResponse> => {
-    const response = await apiClient.post('/api/ajoscore/onboarding', data);
+  getProgress: async (): Promise<SetupProgressResponse> => {
+    const response = await apiClient.get('/api/setup/progress');
     return response.data;
-  }
+  },
+
+  submitStep1: async (data: { occupation: string }): Promise<SetupStepResponse> => {
+    const response = await apiClient.post('/api/setup/step1', data);
+    return response.data;
+  },
+
+  submitStep2: async (data: {
+    trade_duration: string;
+    state: string;
+    lga: string;
+    income_range: string;
+  }): Promise<SetupStepResponse> => {
+    const response = await apiClient.post('/api/setup/step2', data);
+    return response.data;
+  },
+
+  submitStep3: async (data: {
+    saves_money: boolean;
+    savings_methods: string[];
+    in_ajo_group: boolean;
+    contribution_consistency: string;
+  }): Promise<SetupStepResponse> => {
+    const response = await apiClient.post('/api/setup/step3', data);
+    return response.data;
+  },
+
+  submitStep4: async (data: {
+    has_borrowed: boolean;
+    repaid_fully: boolean;
+    repaid_on_time: boolean;
+  }): Promise<SetupStepResponse> => {
+    const response = await apiClient.post('/api/setup/step4', data);
+    return response.data;
+  },
+
+  submitStep5: async (data: {
+    language: string;
+    profile_photo?: string | null;
+  }): Promise<SetupFinalResponse> => {
+    const response = await apiClient.post('/api/setup/step5', data);
+    return response.data;
+  },
 };
