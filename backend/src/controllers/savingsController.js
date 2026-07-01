@@ -210,10 +210,78 @@ async function breakGoal(req, res, next) {
   }
 }
 
+async function getOverview(req, res, next) {
+  try {
+    const result = await pool.query(
+      `SELECT
+        COUNT(*) as total_goals,
+        COALESCE(SUM(locked_balance), 0) as total_saved,
+        COALESCE(SUM(target_amount), 0) as total_target,
+        COUNT(CASE WHEN status = 'active' THEN 1 END) as active_goals,
+        COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_goals
+       FROM savings_goals WHERE user_id = $1`,
+      [req.user.id]
+    );
+
+    const row = result.rows[0];
+    const totalSaved = parseFloat(row.total_saved);
+    const totalTarget = parseFloat(row.total_target);
+
+    return success(res, {
+      total_savings: totalSaved,
+      total_target: totalTarget,
+      overall_progress: totalTarget > 0 ? Math.round((totalSaved / totalTarget) * 100) : 0,
+      active_goals: parseInt(row.active_goals, 10),
+      completed_goals: parseInt(row.completed_goals, 10),
+      total_goals: parseInt(row.total_goals, 10),
+    }, 'Overview fetched successfully');
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getActivity(req, res, next) {
+  try {
+    const result = await pool.query(
+      `SELECT si.id, si.amount, si.status, si.paid_at as date,
+              sg.name as goal_name, 'instalment' as type
+       FROM savings_instalments si
+       JOIN savings_goals sg ON sg.id = si.goal_id
+       WHERE si.user_id = $1
+       ORDER BY si.paid_at DESC NULLS LAST
+       LIMIT 20`,
+      [req.user.id]
+    );
+
+    return success(res, result.rows, 'Activity fetched successfully');
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getAutomationRules(req, res, next) {
+  try {
+    const result = await pool.query(
+      `SELECT id, name, instalment_amount as amount, frequency, status
+       FROM savings_goals
+       WHERE user_id = $1 AND status = 'active'
+       ORDER BY created_at DESC`,
+      [req.user.id]
+    );
+
+    return success(res, result.rows, 'Automation rules fetched successfully');
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   createGoal,
   setupGoalPayment,
   getMyGoals,
   getGoalById,
   breakGoal,
+  getOverview,
+  getActivity,
+  getAutomationRules,
 };
