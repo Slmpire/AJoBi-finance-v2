@@ -147,6 +147,46 @@ async function transferToBank({
   return data.data;
 }
 
+// ============================
+// CHECKOUT (payment links)
+// ============================
+
+async function createCheckoutOrder({
+  amount,
+  customerEmail,
+  orderReference,
+  customerId,
+  callbackUrl,
+  narration,
+}) {
+  const data = await request('POST', '/v1/checkout/order', {
+    order: {
+      callbackUrl: callbackUrl || process.env.NOMBA_WEBHOOK_CALLBACK_URL,
+      customerEmail,
+      amount: amount.toFixed(2),
+      currency: 'NGN',
+      orderReference,
+      customerId: customerId || customerEmail,
+      accountId: process.env.NOMBA_SUB_ACCOUNT_ID,
+      allowedPaymentMethods: ['Card', 'Transfer'],
+      orderMetaData: {
+        productName: narration || 'AjoBI Payment',
+        internalRef: orderReference,
+      },
+    },
+    tokenizeCard: 'false',
+  });
+
+  return data.data; // { checkoutLink, orderReference }
+}
+
+async function verifyCheckoutOrder(orderReference) {
+  const data = await request(
+    'GET',
+    `/v1/checkout/transaction?idType=orderReference&id=${orderReference}`
+  );
+  return data.data;
+}
 module.exports = {
   getAccessToken,
   request,
@@ -154,4 +194,6 @@ module.exports = {
   getBankCodes,
   lookupBankAccount,
   transferToBank,
+  createCheckoutOrder,
+  verifyCheckoutOrder,
 };
