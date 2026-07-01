@@ -27,7 +27,6 @@ export interface UserData {
   profile_photo?: string;
   onboarding_complete: boolean;
   member_since?: string;
-  squad_wallet_balance?: number;
 }
 
 export interface LoginResponse {
@@ -58,42 +57,97 @@ export interface RegisterResponse {
 
 export const authService = {
   login: async (credentials: any): Promise<LoginResponse> => {
-    const response = await apiClient.post<LoginResponse>('/api/auth/login', credentials);
-    const data = response.data as any;
-    if (data.status === true || data.success === true) {
-      if (data.data?.token) {
-        localStorage.setItem('token', data.data.token);
-      }
-      if (data.data?.user_id) {
-        localStorage.setItem('userId', data.data.user_id);
-      }
+    const response = await apiClient.post('/api/auth/login', {
+      email: credentials.email,
+      password: credentials.password,
+    });
+    const raw = response.data as any;
+    const d = raw.data || {};
+
+    const normalized: LoginResponse = {
+      status: raw.status,
+      message: raw.message,
+      data: {
+        user_id: String(d.user_id || d.user?.id || d.id || ''),
+        full_name: d.full_name || d.user?.full_name || '',
+        token: d.token || '',
+        email: d.email || d.user?.email || '',
+        ajo_score: d.ajo_score || 0,
+        score_tier: d.score_tier || 'Starter',
+        onboarding_complete: d.onboarding_complete ?? false,
+      },
+    };
+
+    if (normalized.data.token) {
+      localStorage.setItem('token', normalized.data.token);
     }
-    return data;
+    if (normalized.data.user_id) {
+      localStorage.setItem('userId', normalized.data.user_id);
+    }
+
+    return normalized;
   },
 
   register: async (payload: RegistrationFormValues): Promise<RegisterResponse> => {
-    const response = await apiClient.post<RegisterResponse>('/api/auth/register', payload);
-    const data = response.data as any;
-    if ((data.status === true || data.success === true) && data.data?.token) {
-      localStorage.setItem('token', data.data.token);
+    const response = await apiClient.post('/api/auth/register', {
+      full_name: payload.fullName,
+      phone: payload.phoneNumber,
+      email: payload.email,
+      password: payload.password,
+    });
+    const raw = response.data as any;
+    const d = raw.data || {};
+
+    const normalized: RegisterResponse = {
+      status: raw.status,
+      message: raw.message,
+      data: {
+        user_id: String(d.user_id || d.user?.id || d.id || ''),
+        full_name: d.user?.full_name || d.full_name || '',
+        phone: d.user?.phone || d.phone || '',
+        token: d.token || '',
+        onboarding_complete: d.onboarding_complete ?? false,
+      },
+    };
+
+    if (normalized.data.token) {
+      localStorage.setItem('token', normalized.data.token);
     }
-    return data;
+
+    return normalized;
   },
 
   getCurrentUser: async (): Promise<{ status: boolean; message: string; data: UserData }> => {
     const response = await apiClient.get('/api/auth/user');
-    return response.data;
+    const raw = response.data as any;
+    const d = raw.data || {};
+
+    return {
+      status: raw.status,
+      message: raw.message,
+      data: {
+        user_id: String(d.id || d.user_id || ''),
+        full_name: d.full_name || '',
+        phone: d.phone || '',
+        email: d.email || '',
+        language: d.language || 'english',
+        profile_photo: d.profile_photo || '',
+        onboarding_complete: d.onboarding_complete ?? false,
+      },
+    };
   },
-  
+
   logout: async () => {
     if (typeof window !== 'undefined') {
       try {
         await apiClient.post('/api/auth/logout');
       } catch (e) {
-        console.error("Logout failed on server", e);
+        console.error('Logout failed on server', e);
       }
       localStorage.removeItem('token');
       localStorage.removeItem('userId');
+      localStorage.removeItem('user');
+      localStorage.removeItem('onboardingComplete');
     }
-  }
+  },
 };
