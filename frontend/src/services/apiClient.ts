@@ -66,8 +66,8 @@ apiClient.interceptors.response.use(
   }
 );
 
-// Enable dummy API responses (mocking)
-const USE_MOCK_API = process.env.NEXT_PUBLIC_USE_MOCK_API === 'true' || true;
+// Mock API Interceptor
+const USE_MOCK_API = process.env.NEXT_PUBLIC_USE_MOCK_API === 'true';
 
 if (USE_MOCK_API) {
   apiClient.interceptors.request.use((config) => {
