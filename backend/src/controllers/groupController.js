@@ -214,11 +214,6 @@ async function getGroupPayments(req, res, next) {
 async function setupDebit(req, res, next) {
   try {
     const { id } = req.params;
-    const { account_number, bank_code } = req.body;
-
-    if (!account_number || !bank_code) {
-      return fail(res, 'Account number and bank code are required', 400);
-    }
 
     const groupResult = await pool.query('SELECT * FROM groups WHERE id = $1', [id]);
 
@@ -240,45 +235,29 @@ async function setupDebit(req, res, next) {
     const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [req.user.id]);
     const user = userResult.rows[0];
 
-    // Verify the account before creating the mandate
-    const lookup = await NombaService.lookupBankAccount(account_number, bank_code);
+    const orderReference = `GRP-${group.id}-USR-${req.user.id}-CYC-${group.current_cycle}-${Date.now()}`;
 
-    const frequencyMap = { weekly: 'WEEKLY', biweekly: 'BIWEEKLY', monthly: 'MONTHLY' };
-    const merchantReference = `GRP-${group.id}-USR-${req.user.id}-${Date.now()}`;
-
-    const startDate = new Date();
-    const endDate = new Date();
-    endDate.setFullYear(endDate.getFullYear() + 1); // mandate valid for a year, renewable later
-
-    const mandate = await NombaService.createDirectDebitMandate({
-      customerAccountNumber: account_number,
-      bankCode: bank_code,
-      customerName: user.full_name,
-      customerAddress: 'Nigeria', // placeholder until we collect a real address field
-      customerAccountName: lookup.accountName,
-      amount: group.contribution_amount,
-      frequency: frequencyMap[group.frequency],
-      narration: `AjoBI - ${group.name}`,
-      customerPhoneNumber: user.phone,
+    const checkout = await NombaService.createCheckoutOrder({
+      amount: parseFloat(group.contribution_amount),
       customerEmail: user.email,
-      merchantReference,
-      startDate: startDate.toISOString().slice(0, 16),
-      endDate: endDate.toISOString().slice(0, 16),
-      startImmediately: true,
+      orderReference,
+      customerId: String(user.id),
+      narration: `${group.name} - Cycle ${group.current_cycle} contribution`,
     });
 
     await pool.query(
-      `UPDATE group_members
-       SET nomba_mandate_id = $1, bank_account = $2, bank_code = $3,
-           account_name = $4, mandate_status = 'awaiting_authentication'
-       WHERE group_id = $5 AND user_id = $6`,
-      [mandate.mandateId, account_number, bank_code, lookup.accountName, id, req.user.id]
+      `INSERT INTO group_payments (group_id, user_id, cycle_number, amount, status, nomba_reference)
+       VALUES ($1, $2, $3, $4, 'pending', $5)
+       ON CONFLICT DO NOTHING`,
+      [group.id, req.user.id, group.current_cycle, group.contribution_amount, orderReference]
     );
 
     return success(res, {
-      mandate_id: mandate.mandateId,
-      authentication_instructions: mandate.description,
-    }, 'Direct debit mandate created. Complete authentication to activate.');
+      checkout_link: checkout.checkoutLink,
+      order_reference: orderReference,
+      amount: group.contribution_amount,
+      instructions: `Complete your ₦${group.contribution_amount} contribution for ${group.name} via the checkout link.`,
+    }, 'Checkout created successfully');
   } catch (err) {
     next(err);
   }
