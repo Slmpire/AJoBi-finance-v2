@@ -1,10 +1,10 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { settingsService, UserProfile, SecuritySettings, NotificationSettings } from '@/services/settingsService';
+import { settingsService } from '@/services/settingsService';
 
 interface SettingsState {
-  profile: UserProfile | null;
-  security: SecuritySettings | null;
-  notifications: NotificationSettings | null;
+  profile: any | null;
+  security: any | null;
+  notifications: any | null;
   isLoading: boolean;
   error: string | null;
 }
@@ -22,7 +22,7 @@ export const fetchProfile = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await settingsService.getProfile();
-      if (response.success) {
+      if (response.status) {
         return response.data;
       }
       return null;
@@ -38,10 +38,8 @@ const settingsSlice = createSlice({
   reducers: {},
   extraReducers: (builder) => {
     builder
-      .addCase(fetchProfile.pending, (state) => {
-        state.isLoading = true;
-      })
-      .addCase(fetchProfile.fulfilled, (state, action: PayloadAction<UserProfile | null>) => {
+      .addCase(fetchProfile.pending, (state) => { state.isLoading = true; })
+      .addCase(fetchProfile.fulfilled, (state, action: PayloadAction<any>) => {
         state.isLoading = false;
         state.profile = action.payload;
       })

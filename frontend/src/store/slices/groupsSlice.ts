@@ -1,12 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { 
-  groupsService, 
-  BrowseGroupsParams, 
-  CreateGroupPayload, 
-  JoinGroupPayload, 
-  AutoMatchPayload, 
-  MandatePayload 
-} from '@/services/groupsService';
+import { groupsService, CreateGroupPayload, JoinGroupPayload } from '@/services/groupsService';
 
 export interface GroupItem {
   id: string;
@@ -20,22 +13,9 @@ export interface GroupItem {
   avatars: string[];
 }
 
-export interface PublicGroup {
-  id: string;
-  name: string;
-  admin: string;
-  amount: string;
-  rawAmount: number;
-  frequency: "Monthly" | "Weekly" | "Bi-Weekly";
-  slots: string;
-  minScore: number;
-  locked?: boolean;
-  tierRequired?: string;
-}
-
 interface GroupsState {
   myGroups: GroupItem[];
-  publicGroups: PublicGroup[];
+  publicGroups: any[];
   currentGroupDetail: any | null;
   matchedGroups: any[];
   contributionHistory: any[];
@@ -67,54 +47,39 @@ const initialState: GroupsState = {
 
 export const fetchMyGroups = createAsyncThunk(
   'groups/fetchMyGroups',
-  async (userId: string, { rejectWithValue }) => {
+  async (_userId: any, { rejectWithValue }) => {
     try {
-      const response = await groupsService.getMyGroups(userId);
-      console.log("my groups", response.data);
-      if (response.success && response.data?.groups) {
-        return response.data.groups.map((g: any) => ({
-          id: g.group_id,
+      const response = await groupsService.getMyGroups();
+      if (response.status && response.data) {
+        return response.data.map((g: any) => ({
+          id: String(g.id),
           name: g.name,
-          type: `${g.frequency.charAt(0).toUpperCase() + g.frequency.slice(1)} Rotation`,
+          type: `${g.frequency?.charAt(0).toUpperCase() + g.frequency?.slice(1)} Rotation`,
           contribution: `₦${parseFloat(g.contribution_amount).toLocaleString()}`,
-          nextPayout: g.my_payout_date ? new Date(g.my_payout_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Awaiting start',
-          position: `${g.my_rotation_position}/${g.total_cycles}`,
-          status: g.my_contribution_status === 'paid' ? 'Paid' : g.my_contribution_status === 'missed' ? 'Missed' : 'Pending',
-          members: g.total_cycles || 10,
+          nextPayout: g.next_collection_date
+            ? new Date(g.next_collection_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            : 'Awaiting start',
+          position: `${g.rotation_position || 1}`,
+          status: g.my_payment_status === 'paid' ? 'Paid' : g.my_payment_status === 'failed' ? 'Missed' : 'Pending',
+          members: parseInt(g.member_count || g.max_members || 0),
           avatars: [],
-          nextRecipient: g.next_recipient || "TBD"
         }));
       }
       return [];
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error?.message || error.message);
+      return rejectWithValue(error.message);
     }
   }
 );
 
 export const fetchPublicGroups = createAsyncThunk(
   'groups/fetchPublicGroups',
-  async (params: BrowseGroupsParams | undefined, { rejectWithValue }) => {
+  async (_params: any, { rejectWithValue }) => {
     try {
-      const response = await groupsService.browseGroups(params);
-      console.log("public groups", response.data);
-      if (response.success && response.data?.groups) {
-        return response.data.groups.map((g: any) => ({
-          id: g.group_id,
-          name: g.name,
-          admin: g.creator_name || "AjoBI Member",
-          amount: `₦${parseFloat(g.contribution_amount).toLocaleString()}/${g.frequency === 'weekly' ? 'wk' : g.frequency === 'monthly' ? 'mo' : 'bw'}`,
-          rawAmount: parseFloat(g.contribution_amount),
-          frequency: g.frequency === 'weekly' ? 'Weekly' : g.frequency === 'monthly' ? 'Monthly' : 'Bi-Weekly',
-          slots: g.spots_remaining ? `${g.spots_remaining} slots left` : `${g.total_cycles || 10} positions`,
-          minScore: g.min_ajo_score || 450,
-          locked: g.locked === 'locked' || g.is_locked,
-          tierRequired: g.tier || "Bronze"
-        }));
-      }
+      // No public groups endpoint yet — return empty
       return [];
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error?.message || error.message);
+      return rejectWithValue(error.message);
     }
   }
 );
@@ -124,12 +89,12 @@ export const createGroup = createAsyncThunk(
   async (payload: CreateGroupPayload, { rejectWithValue }) => {
     try {
       const response = await groupsService.createGroup(payload);
-      if (response.success) {
+      if (response.status) {
         return response.data;
       }
-      return rejectWithValue(response.error?.message || 'Failed to create group');
+      return rejectWithValue(response.message || 'Failed to create group');
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error?.message || error.message);
+      return rejectWithValue(error.message);
     }
   }
 );
@@ -139,72 +104,65 @@ export const fetchGroupDetail = createAsyncThunk(
   async (groupId: string, { rejectWithValue }) => {
     try {
       const response = await groupsService.getGroupDetail(groupId);
-      if (response.success) {
+      if (response.status) {
         return response.data;
       }
       return rejectWithValue('Failed to fetch group details');
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error?.message || error.message);
+      return rejectWithValue(error.message);
     }
   }
 );
 
 export const joinGroup = createAsyncThunk(
   'groups/joinGroup',
-  async ({ groupId, payload }: { groupId: string; payload: JoinGroupPayload }, { rejectWithValue }) => {
+  async (payload: JoinGroupPayload, { rejectWithValue }) => {
     try {
-      const response = await groupsService.joinGroup(groupId, payload);
-      if (response.success) {
+      const response = await groupsService.joinGroup(payload);
+      if (response.status) {
         return response.data;
       }
       return rejectWithValue('Failed to join group');
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error?.message || error.message);
+      return rejectWithValue(error.message);
     }
   }
 );
 
 export const autoMatchGroup = createAsyncThunk(
   'groups/autoMatchGroup',
-  async (payload: AutoMatchPayload, { rejectWithValue }) => {
-    try {
-      const response = await groupsService.autoMatchGroup(payload);
-      if (response.success) {
-        return response.data.matches;
-      }
-      return rejectWithValue('Failed to match group');
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error?.message || error.message);
-    }
+  async (_payload: any, { rejectWithValue }) => {
+    // Not implemented yet
+    return rejectWithValue('Auto match not available yet');
   }
 );
 
 export const setupDirectDebitMandate = createAsyncThunk(
   'groups/setupDirectDebitMandate',
-  async ({ groupId, payload }: { groupId: string; payload: MandatePayload }, { rejectWithValue }) => {
+  async ({ groupId }: { groupId: string; payload?: any }, { rejectWithValue }) => {
     try {
-      const response = await groupsService.setupDirectDebitMandate(groupId, payload);
-      if (response.success) {
+      const response = await groupsService.setupDebit(groupId);
+      if (response.status) {
         return response.data;
       }
-      return rejectWithValue('Failed to setup mandate');
+      return rejectWithValue('Failed to setup payment');
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error?.message || error.message);
+      return rejectWithValue(error.message);
     }
   }
 );
 
 export const fetchGroupContributionHistory = createAsyncThunk(
   'groups/fetchGroupContributionHistory',
-  async ({ groupId, cycle }: { groupId: string; cycle?: string }, { rejectWithValue }) => {
+  async ({ groupId }: { groupId: string; cycle?: string }, { rejectWithValue }) => {
     try {
-      const response = await groupsService.getGroupContributionHistory(groupId, cycle);
-      if (response.success) {
-        return response.data.contributions;
+      const response = await groupsService.getGroupPayments(groupId);
+      if (response.status) {
+        return response.data || [];
       }
-      return rejectWithValue('Failed to fetch contribution history');
+      return [];
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error?.message || error.message);
+      return rejectWithValue(error.message);
     }
   }
 );
@@ -213,21 +171,13 @@ const groupsSlice = createSlice({
   name: 'groups',
   initialState,
   reducers: {
-    clearMatchError: (state) => {
-      state.matchError = null;
-    },
-    clearJoinError: (state) => {
-      state.joinError = null;
-    },
-    clearCreateError: (state) => {
-      state.createError = null;
-    }
+    clearMatchError: (state) => { state.matchError = null; },
+    clearJoinError: (state) => { state.joinError = null; },
+    clearCreateError: (state) => { state.createError = null; },
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchMyGroups.pending, (state) => {
-        state.isLoading = true;
-      })
+      .addCase(fetchMyGroups.pending, (state) => { state.isLoading = true; })
       .addCase(fetchMyGroups.fulfilled, (state, action: PayloadAction<GroupItem[]>) => {
         state.isLoading = false;
         state.myGroups = action.payload;
@@ -236,34 +186,19 @@ const groupsSlice = createSlice({
         state.isLoading = false;
         state.error = action.payload as string;
       })
-      
-      .addCase(fetchPublicGroups.pending, (state) => {
-        state.isLoading = true;
-      })
-      .addCase(fetchPublicGroups.fulfilled, (state, action: PayloadAction<PublicGroup[]>) => {
-        state.isLoading = false;
+      .addCase(fetchPublicGroups.fulfilled, (state, action) => {
         state.publicGroups = action.payload;
       })
-      .addCase(fetchPublicGroups.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload as string;
-      })
-
       .addCase(createGroup.pending, (state) => {
         state.isCreating = true;
         state.createError = null;
       })
-      .addCase(createGroup.fulfilled, (state) => {
-        state.isCreating = false;
-      })
+      .addCase(createGroup.fulfilled, (state) => { state.isCreating = false; })
       .addCase(createGroup.rejected, (state, action) => {
         state.isCreating = false;
         state.createError = action.payload as string;
       })
-
-      .addCase(fetchGroupDetail.pending, (state) => {
-        state.isLoading = true;
-      })
+      .addCase(fetchGroupDetail.pending, (state) => { state.isLoading = true; })
       .addCase(fetchGroupDetail.fulfilled, (state, action) => {
         state.isLoading = false;
         state.currentGroupDetail = action.payload;
@@ -272,46 +207,32 @@ const groupsSlice = createSlice({
         state.isLoading = false;
         state.error = action.payload as string;
       })
-
       .addCase(joinGroup.pending, (state) => {
         state.isJoining = true;
         state.joinError = null;
       })
-      .addCase(joinGroup.fulfilled, (state) => {
-        state.isJoining = false;
-      })
+      .addCase(joinGroup.fulfilled, (state) => { state.isJoining = false; })
       .addCase(joinGroup.rejected, (state, action) => {
         state.isJoining = false;
         state.joinError = action.payload as string;
       })
-
       .addCase(autoMatchGroup.pending, (state) => {
         state.isMatching = true;
         state.matchError = null;
       })
-      .addCase(autoMatchGroup.fulfilled, (state, action) => {
+      .addCase(autoMatchGroup.fulfilled, (state) => {
         state.isMatching = false;
-        state.matchedGroups = action.payload;
+        state.matchedGroups = [];
       })
       .addCase(autoMatchGroup.rejected, (state, action) => {
         state.isMatching = false;
         state.matchError = action.payload as string;
       })
-
-      .addCase(fetchGroupContributionHistory.pending, (state) => {
-        state.isLoading = true;
-      })
       .addCase(fetchGroupContributionHistory.fulfilled, (state, action) => {
-        state.isLoading = false;
         state.contributionHistory = action.payload;
-      })
-      .addCase(fetchGroupContributionHistory.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload as string;
       });
   },
 });
 
 export const { clearMatchError, clearJoinError, clearCreateError } = groupsSlice.actions;
-
 export default groupsSlice.reducer;

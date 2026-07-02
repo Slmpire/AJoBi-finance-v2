@@ -32,4 +32,9 @@ export const escrowService = {
     const response = await apiClient.post(`/api/escrow/${escrowId}/confirm`);
     return response.data;
   },
+
+  getUserEscrows: async (_userId: any, _params?: any) => {
+  const response = await apiClient.get('/api/escrow/mine');
+  return response.data;
+},
 };

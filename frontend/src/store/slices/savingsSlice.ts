@@ -1,12 +1,12 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { savingsService, SavingsGoal, AutomationRule, SavingsActivity } from '@/services/savingsService';
+import { savingsService } from '@/services/savingsService';
 
 interface SavingsState {
   balance: number;
   balanceDiff: number;
-  goals: SavingsGoal[];
-  automationRules: AutomationRule[];
-  activities: SavingsActivity[];
+  goals: any[];
+  automationRules: any[];
+  activities: any[];
   isLoading: boolean;
   error: string | null;
 }
@@ -26,7 +26,7 @@ export const fetchSavingsOverview = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await savingsService.getOverview();
-      if (response.success) {
+      if (response.status) {
         return response.data;
       }
       return null;
@@ -41,8 +41,8 @@ export const fetchSavingsGoals = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await savingsService.getGoals();
-      if (response.success) {
-        return response.data.goals;
+      if (response.status) {
+        return response.data || [];
       }
       return [];
     } catch (error: any) {
@@ -63,15 +63,15 @@ const savingsSlice = createSlice({
       .addCase(fetchSavingsOverview.fulfilled, (state, action: PayloadAction<any>) => {
         state.isLoading = false;
         if (action.payload) {
-          state.balance = action.payload.balance;
-          state.balanceDiff = action.payload.balance_diff;
+          state.balance = action.payload.total_savings || 0;
+          state.balanceDiff = 0;
         }
       })
       .addCase(fetchSavingsOverview.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
       })
-      .addCase(fetchSavingsGoals.fulfilled, (state, action: PayloadAction<SavingsGoal[]>) => {
+      .addCase(fetchSavingsGoals.fulfilled, (state, action: PayloadAction<any[]>) => {
         state.goals = action.payload;
       });
   },
