@@ -1,5 +1,12 @@
 import { apiClient } from './apiClient';
 
+export interface KYCData {
+  user_id: string | number;
+  beneficiary_account: string;
+  bvn: string;
+  account_name: string;
+}
+
 export const userService = {
   getProfile: async () => {
     const response = await apiClient.get('/api/user/profile');
@@ -28,5 +35,19 @@ export const userService = {
   getDashboardSummary: async () => {
     const response = await apiClient.get('/api/user/dashboard');
     return response.data;
+  },
+
+  // Legacy stubs — kept so existing components don't break
+  updateKYC: async (data: KYCData) => {
+    const response = await apiClient.patch('/api/user/beneficiary', {
+      account_number: data.beneficiary_account,
+      account_name: data.account_name,
+      bank_code: '000',
+    });
+    return { success: response.data.status ? 'true' : 'false', message: response.data.message };
+  },
+
+  createVirtualAccount: async (_userId: string | number) => {
+    return { status: 'pending', data: null };
   },
 };

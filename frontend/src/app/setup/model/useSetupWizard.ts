@@ -156,12 +156,30 @@ export const useSetupWizard = () => {
         nextStep();
       } else if (currentStep === 5) {
         const res = await setupService.submitStep5({
-          language: formData.language,
-          profile_photo: null,
-          email: email
-        });
-        setScoreData(res.data);
-        nextStep();
+  language: formData.language,
+  profile_photo: null,
+  email: email
+});
+setScoreData(res.data);
+
+// Update localStorage so dashboard reads the real score immediately
+if (res.data && typeof window !== 'undefined') {
+  const storedUser = localStorage.getItem('user');
+  if (storedUser) {
+    try {
+      const user = JSON.parse(storedUser);
+      user.ajo_score = res.data.ajo_score;
+      user.score_tier = res.data.score_tier;
+      user.onboarding_complete = true;
+      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('onboardingComplete', 'true');
+    } catch (e) {
+      console.error('Failed to update user in localStorage', e);
+    }
+  }
+}
+
+nextStep();
       }
     } catch (err: any) {
       console.error(`Failed to save step ${currentStep}:`, err);

@@ -1,10 +1,10 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { scoreService, AjoScoreData, ScoreHistoryItem, ScoreEvent, EligibilityData } from '@/services/scoreService';
+import { scoreService, AjoScoreData, EligibilityData } from '@/services/scoreService';
 
 interface ScoreState {
   ajoScore: AjoScoreData | null;
-  history: ScoreHistoryItem[];
-  events: ScoreEvent[];
+  history: any[];
+  events: any[];
   eligibility: EligibilityData | null;
   isLoading: boolean;
   error: string | null;
@@ -21,13 +21,26 @@ const initialState: ScoreState = {
 
 export const fetchAjoScore = createAsyncThunk(
   'score/fetchAjoScore',
-  async (userId: string, { rejectWithValue }) => {
+  async (_userId: any, { rejectWithValue }) => {
     try {
-      const response = await scoreService.getAjoScore(userId);
-      // const response = await scoreService.getAjoScore();
-      console.log("ajo score", response);
-      if (response.success) {
-        return response.data;
+      const response = await scoreService.getAjoScore();
+      if (response.status) {
+        return response.data as AjoScoreData;
+      }
+      return null;
+    } catch (error: any) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const fetchEligibility = createAsyncThunk(
+  'score/fetchEligibility',
+  async (_userId: any, { rejectWithValue }) => {
+    try {
+      const response = await scoreService.getEligibility();
+      if (response.status) {
+        return response.data as EligibilityData;
       }
       return null;
     } catch (error: any) {
@@ -38,11 +51,11 @@ export const fetchAjoScore = createAsyncThunk(
 
 export const fetchScoreHistory = createAsyncThunk(
   'score/fetchScoreHistory',
-  async ({ userId, days }: { userId: string; days?: 30 | 60 | 90 }, { rejectWithValue }) => {
+  async (_args: any, { rejectWithValue }) => {
     try {
-      const response = await scoreService.getScoreHistory(userId, days);
-      if (response.success) {
-        return response.data.history;
+      const response = await scoreService.getScoreHistory();
+      if (response.status) {
+        return response.data || [];
       }
       return [];
     } catch (error: any) {
@@ -53,28 +66,13 @@ export const fetchScoreHistory = createAsyncThunk(
 
 export const fetchScoreEvents = createAsyncThunk(
   'score/fetchScoreEvents',
-  async ({ userId, limit, offset }: { userId: string; limit?: number; offset?: number }, { rejectWithValue }) => {
+  async (_args: any, { rejectWithValue }) => {
     try {
-      const response = await scoreService.getScoreEvents(userId, limit, offset);
-      if (response.success) {
-        return response.data.events;
+      const response = await scoreService.getScoreEvents();
+      if (response.status) {
+        return response.data || [];
       }
       return [];
-    } catch (error: any) {
-      return rejectWithValue(error.message);
-    }
-  }
-);
-
-export const fetchEligibility = createAsyncThunk(
-  'score/fetchEligibility',
-  async (userId: string, { rejectWithValue }) => {
-    try {
-      const response = await scoreService.getEligibility(userId);
-      if (response.success) {
-        return response.data;
-      }
-      return null;
     } catch (error: any) {
       return rejectWithValue(error.message);
     }
@@ -98,10 +96,10 @@ const scoreSlice = createSlice({
         state.isLoading = false;
         state.error = action.payload as string;
       })
-      .addCase(fetchScoreHistory.fulfilled, (state, action: PayloadAction<ScoreHistoryItem[]>) => {
+      .addCase(fetchScoreHistory.fulfilled, (state, action) => {
         state.history = action.payload;
       })
-      .addCase(fetchScoreEvents.fulfilled, (state, action: PayloadAction<ScoreEvent[]>) => {
+      .addCase(fetchScoreEvents.fulfilled, (state, action) => {
         state.events = action.payload;
       })
       .addCase(fetchEligibility.fulfilled, (state, action: PayloadAction<EligibilityData | null>) => {
