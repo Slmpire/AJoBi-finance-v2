@@ -16,5 +16,8 @@ const upload = multer({ storage: multer.memoryStorage() });
 router.get('/me', auth, getMyScore);
 router.post('/onboarding', auth, submitOnboarding);
 router.post('/bank-statement', auth, upload.single('file'), uploadBankStatement);
+router.get('/history', auth, getScoreHistory);
+router.get('/events', auth, getScoreEvents);
+router.get('/eligibility', auth, getEligibility);
 
 module.exports = router;

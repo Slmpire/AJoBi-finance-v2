@@ -17,7 +17,7 @@ export interface LockedFeature {
 
 export interface AjoScoreData {
   score: number;
-  tier: string | { name: string; color: string; next: string; points_to_next: number };
+  tier: string;
   tier_color: string;
   next_tier: string;
   points_to_next_tier: number;
@@ -66,38 +66,30 @@ export interface EligibilityData {
 }
 
 export const scoreService = {
-  getAjoScore: async (userId?: string) =>  {
-    const response = await apiClient.get(`/api/ajoscore/me`);
-    return response.data;
-  },
-
-  submitOnboarding: async (payload: { occupation: string; monthly_income: number; earning_duration: string }) => {
-    const response = await apiClient.post(`/api/ajoscore/onboarding`, payload);
+  getAjoScore: async () => {
+    const response = await apiClient.get('/api/ajoscore/me');
     return response.data;
   },
 
   uploadBankStatement: async (formData: FormData) => {
-    // Note: formData must be passed to support multipart/form-data
-    const response = await apiClient.post(`/api/ajoscore/bank-statement`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+    const response = await apiClient.post('/api/ajoscore/bank-statement', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
   },
 
-  getScoreHistory: async (userId: string, days: 30 | 60 | 90 = 30) => {
-    const response = await apiClient.get(`/api/score/${userId}/history`, { params: { days } });
+  getScoreHistory: async (days: 30 | 60 | 90 = 30) => {
+    const response = await apiClient.get('/api/score/history', { params: { days } });
     return response.data;
   },
 
-  getScoreEvents: async (userId: string, limit: number = 20, offset: number = 0) => {
-    const response = await apiClient.get(`/api/score/${userId}/events`, { params: { limit, offset } });
+  getScoreEvents: async (limit: number = 20, offset: number = 0) => {
+    const response = await apiClient.get('/api/score/events', { params: { limit, offset } });
     return response.data;
   },
 
-  getEligibility: async (userId: string) => {
-    const response = await apiClient.get(`/api/score/${userId}/eligibility`);
+  getEligibility: async () => {
+    const response = await apiClient.get('/api/score/eligibility');
     return response.data;
-  }
+  },
 };
