@@ -1,30 +1,32 @@
 import { apiClient } from './apiClient';
 
-export interface KYCData {
-  user_id: string | number;
-  beneficiary_account: string;
-  bvn: string;
-  account_name: string;
-}
-
-export interface KYCResponse {
-  success: string;
-  message: string;
-}
-
-export interface VirtualAccountResponse {
-  status: string;
-  data: any;
-}
-
 export const userService = {
-  updateKYC: async (data: KYCData): Promise<KYCResponse> => {
-    const response = await apiClient.post<KYCResponse>('/api/user/kyc', data);
+  getProfile: async () => {
+    const response = await apiClient.get('/api/user/profile');
     return response.data;
   },
 
-  createVirtualAccount: async (userId: string | number): Promise<VirtualAccountResponse> => {
-    const response = await apiClient.post<VirtualAccountResponse>('/api/user/virtualaccounts', { user_id: userId });
+  updateProfile: async (payload: {
+    full_name?: string;
+    phone?: string;
+    language?: string;
+    profile_photo?: string;
+  }) => {
+    const response = await apiClient.patch('/api/user/profile', payload);
     return response.data;
-  }
+  },
+
+  updateBeneficiary: async (payload: {
+    account_number: string;
+    account_name: string;
+    bank_code: string;
+  }) => {
+    const response = await apiClient.patch('/api/user/beneficiary', payload);
+    return response.data;
+  },
+
+  getDashboardSummary: async () => {
+    const response = await apiClient.get('/api/user/dashboard');
+    return response.data;
+  },
 };
