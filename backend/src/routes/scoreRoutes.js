@@ -20,4 +20,9 @@ router.get('/history', auth, getScoreHistory);
 router.get('/events', auth, getScoreEvents);
 router.get('/eligibility', auth, getEligibility);
 
+// userId in path variants — same handler, JWT user used
+router.get('/:userId/history', auth, getScoreHistory);
+router.get('/:userId/events', auth, getScoreEvents);
+router.get('/:userId/eligibility', auth, getEligibility);
+
 module.exports = router;
