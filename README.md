@@ -757,4 +757,3 @@ MIT
 ---
 
 *Built for the DevCareer x Nomba Hackathon 2026*
-```
