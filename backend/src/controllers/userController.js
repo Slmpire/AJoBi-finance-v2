@@ -17,7 +17,6 @@ async function getProfile(req, res, next) {
     );
 
     if (result.rows.length === 0) return fail(res, 'User not found', 404);
-
     return success(res, result.rows[0], 'Profile fetched successfully');
   } catch (err) {
     next(err);
@@ -55,9 +54,7 @@ async function updateBeneficiary(req, res, next) {
     }
 
     await pool.query(
-      `UPDATE users
-       SET beneficiary_account = $1, account_name = $2, updated_at = NOW()
-       WHERE id = $3`,
+      `UPDATE users SET beneficiary_account = $1, account_name = $2, updated_at = NOW() WHERE id = $3`,
       [account_number, account_name, req.user.id]
     );
 
@@ -81,14 +78,13 @@ async function getDashboardSummary(req, res, next) {
       ),
       pool.query(
         `SELECT COUNT(*) as total,
-           SUM(locked_balance) as total_saved,
-           SUM(target_amount) as total_target
+           COALESCE(SUM(locked_balance), 0) as total_saved,
+           COALESCE(SUM(target_amount), 0) as total_target
          FROM savings_goals WHERE user_id = $1 AND status != 'broken'`,
         [req.user.id]
       ),
       pool.query(
-        `SELECT COUNT(*) as total
-         FROM escrows
+        `SELECT COUNT(*) as total FROM escrows
          WHERE (creator_user_id = $1 OR recipient_user_id = $1)
          AND status NOT IN ('released', 'refunded')`,
         [req.user.id]
@@ -100,7 +96,7 @@ async function getDashboardSummary(req, res, next) {
       score_tier: scoreRes.rows[0]?.tier || 'Starter',
       groups: {
         total: parseInt(groupsRes.rows[0].total, 10),
-        active: parseInt(groupsRes.rows[0].active, 10),
+        active: parseInt(groupsRes.rows[0].active || 0, 10),
       },
       savings: {
         total_goals: parseInt(savingsRes.rows[0].total, 10),
@@ -116,4 +112,109 @@ async function getDashboardSummary(req, res, next) {
   }
 }
 
-module.exports = { getProfile, updateProfile, updateBeneficiary, getDashboardSummary };
+async function submitKYC(req, res, next) {
+  try {
+    const { bvn, account_number, account_name, bank_code } = req.body;
+
+    // BVN validation — any 11 digits for hackathon
+    if (!bvn || !/^\d{11}$/.test(bvn)) {
+      return fail(res, 'BVN must be exactly 11 digits', 400);
+    }
+
+    if (!account_number || !account_name || !bank_code) {
+      return fail(res, 'Account number, account name and bank code are required', 400);
+    }
+
+    await pool.query(
+      `UPDATE users
+       SET bvn = $1, beneficiary_account = $2, account_name = $3, updated_at = NOW()
+       WHERE id = $4`,
+      [bvn, account_number, account_name, req.user.id]
+    );
+
+    return success(res, {
+      kyc_status: 'verified',
+      bvn_verified: true,
+      account_verified: true,
+    }, 'KYC submitted successfully');
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getVirtualAccount(req, res, next) {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM virtual_accounts WHERE user_id = $1',
+      [req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return success(res, null, 'No virtual account found');
+    }
+
+    return success(res, result.rows[0], 'Virtual account fetched');
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function createGroupVirtualAccount(req, res, next) {
+  try {
+    const { group_id } = req.body;
+
+    // Simulate virtual account creation for hackathon
+    const accountNumber = '920' + Math.floor(Math.random() * 10000000).toString().padStart(7, '0');
+
+    return success(res, {
+      account_number: accountNumber,
+      account_name: 'AjoBI Group Collection',
+      bank_name: 'Nomba MFB',
+      group_id,
+    }, 'Group virtual account ready');
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function recordGroupPayment(req, res, next) {
+  try {
+    const { group_id } = req.body;
+
+    const groupResult = await pool.query('SELECT * FROM groups WHERE id = $1', [group_id]);
+    if (groupResult.rows.length === 0) return fail(res, 'Group not found', 404);
+
+    const group = groupResult.rows[0];
+
+    const existing = await pool.query(
+      `SELECT * FROM group_payments WHERE group_id = $1 AND user_id = $2 AND cycle_number = $3`,
+      [group_id, req.user.id, group.current_cycle]
+    );
+
+    if (existing.rows.length > 0 && existing.rows[0].status === 'paid') {
+      return fail(res, 'You have already paid for this cycle', 400);
+    }
+
+    await pool.query(
+      `INSERT INTO group_payments (group_id, user_id, cycle_number, amount, status, paid_at)
+       VALUES ($1, $2, $3, $4, 'paid', NOW())
+       ON CONFLICT DO NOTHING`,
+      [group_id, req.user.id, group.current_cycle, group.contribution_amount]
+    );
+
+    return success(res, { paid: true }, 'Payment recorded');
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = {
+  getProfile,
+  updateProfile,
+  updateBeneficiary,
+  getDashboardSummary,
+  submitKYC,
+  getVirtualAccount,
+  createGroupVirtualAccount,
+  recordGroupPayment,
+};
