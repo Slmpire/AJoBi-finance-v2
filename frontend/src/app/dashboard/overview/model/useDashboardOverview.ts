@@ -158,24 +158,23 @@ export const useDashboardOverview = () => {
     }
   };
 
-  const handleCreateVirtualAccount = async () => {
-    if (!userId) return;
-    setVirtualAccountLoading(true);
-    setKycError(null);
-    try {
-      const response = await userService.createVirtualAccount(userId);
-      // Our stub returns data directly
-      setVirtualAccountData({
-        accountNumber: response.data?.account_number || '9200000001',
-        accountName: response.data?.account_name || 'AjoBI User',
-        bankName: response.data?.bank_name || 'Nomba MFB',
-      });
-    } catch (error: any) {
-      setKycError(error.message || 'Virtual account creation failed');
-    } finally {
-      setVirtualAccountLoading(false);
-    }
-  };
+ const handleCreateVirtualAccount = async () => {
+  if (!userId) return;
+  setVirtualAccountLoading(true);
+  setKycError(null);
+  try {
+    const response = await userService.createVirtualAccount(userId) as any;
+    setVirtualAccountData({
+      accountNumber: response?.data?.account_number || '9200000001',
+      accountName: response?.data?.account_name || 'AjoBI User',
+      bankName: response?.data?.bank_name || 'Nomba MFB',
+    });
+  } catch (error: any) {
+    setKycError(error.message || 'Virtual account creation failed');
+  } finally {
+    setVirtualAccountLoading(false);
+  }
+};
 
   return {
     isLoading,
