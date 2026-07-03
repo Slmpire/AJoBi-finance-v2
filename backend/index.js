@@ -39,6 +39,7 @@ app.use('/api/groups', groupRoutes);
 app.use('/api/savings', savingsRoutes);
 app.use('/api/escrow', escrowRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/settings', settingsRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ status: false, message: 'Route not found', data: null });

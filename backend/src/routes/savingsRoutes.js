@@ -22,6 +22,7 @@ router.post('/create', auth, createGoal);
 // Parameterised routes after
 router.get('/:id', auth, getGoalById);
 router.post('/:id/setup-payment', auth, setupGoalPayment);
+router.post('/:id/setup-debit', auth, setupGoalPayment);
 router.post('/:id/break', auth, breakGoal);
 
 module.exports = router;
