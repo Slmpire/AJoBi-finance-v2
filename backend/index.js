@@ -14,6 +14,7 @@ const savingsRoutes = require('./src/routes/savingsRoutes');
 const escrowRoutes = require('./src/routes/escrowRoutes');
 const adminRoutes = require('./src/routes/adminRoutes');
 const webhookRoutes = require('./src/routes/webhookRoutes');
+const settingsRoutes = require('./src/routes/settingsRoutes');
 
 const app = express();
 
