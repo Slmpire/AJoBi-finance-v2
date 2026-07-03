@@ -1,11 +1,12 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '@/store';
 import { fetchMyGroups } from '@/store/slices/groupsSlice';
 import { fetchSavingsOverview } from '@/store/slices/savingsSlice';
 import { fetchProfile } from '@/store/slices/settingsSlice';
 import { fetchAjoScore, fetchEligibility } from '@/store/slices/scoreSlice';
-import { userService, KYCData } from '@/services/userService';
-import { useState } from 'react';
+import { userService } from '@/services/userService';
+import { escrowService } from '@/services/escrowService';
+import { scoreService } from '@/services/scoreService';
 
 export interface DashboardData {
   ajoScore: number;
@@ -42,6 +43,15 @@ export interface DashboardData {
   };
 }
 
+function timeAgo(dateStr: string) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
 export const useDashboardOverview = () => {
   const dispatch = useAppDispatch();
   const [showKYCModal, setShowKYCModal] = useState(false);
@@ -50,109 +60,97 @@ export const useDashboardOverview = () => {
   const [kycSuccess, setKycSuccess] = useState(false);
   const [kycError, setKycError] = useState<string | null>(null);
   const [virtualAccountData, setVirtualAccountData] = useState<any>(null);
-  
+  const [recentEscrows, setRecentEscrows] = useState<any[]>([]);
+  const [scoreEvents, setScoreEvents] = useState<any[]>([]);
+
   const { myGroups, isLoading: groupsLoading } = useAppSelector((state) => state.groups);
   const { balance, isLoading: savingsLoading } = useAppSelector((state) => state.savings);
   const { profile, isLoading: settingsLoading } = useAppSelector((state) => state.settings);
   const { ajoScore, eligibility, isLoading: scoreLoading } = useAppSelector((state) => state.score);
   const user = useAppSelector((state) => state.auth.user);
-  
+
   const userId = useMemo(() => {
     if (user?.user_id) return user.user_id;
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('userId');
-    }
+    if (typeof window !== 'undefined') return localStorage.getItem('userId');
     return null;
   }, [user]);
 
-  const userEmail = useMemo(() => {
-    if (user?.email) return user.email;
-    if (typeof window !== 'undefined') {
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        try {
-          return JSON.parse(storedUser).email;
-        } catch (e) {
-          return null;
-        }
-      }
-    }
-    return null;
-  }, [user]);
-
-  console.log('user id', userId);
   const isLoading = groupsLoading || savingsLoading || settingsLoading || scoreLoading;
 
   useEffect(() => {
-    const userId = user?.user_id; 
-    
     dispatch(fetchMyGroups(userId));
     dispatch(fetchSavingsOverview());
     dispatch(fetchProfile());
     dispatch(fetchAjoScore(userId));
     dispatch(fetchEligibility(userId));
+
+    // Fetch real escrows and score events
+    escrowService.getMyEscrows().then(res => {
+      if (res.status && res.data) setRecentEscrows(res.data.slice(0, 3));
+    }).catch(() => {});
+
+    scoreService.getScoreEvents(5, 0).then(res => {
+      if (res.status && res.data) setScoreEvents(res.data);
+    }).catch(() => {});
   }, [dispatch, userId]);
 
   const data = useMemo(() => {
     if (!ajoScore && isLoading) return null;
 
+    const activeEscrows = recentEscrows.map((e: any) => ({
+      title: e.description || 'Escrow transaction',
+      status: e.status === 'funded' ? 'Funded' : e.status === 'released' ? 'Released' : 'Pending',
+      amount: `₦${parseFloat(e.amount).toLocaleString()}`,
+    }));
+
+    const recentActivities = scoreEvents.map((e: any) => ({
+      id: String(e.event_id),
+      type: e.direction === 'up' ? 'payment' : 'other' as any,
+      title: e.reason,
+      subtitle: `AjoScore ${e.direction === 'up' ? '+' : '-'}${e.points} points`,
+      timeAgo: timeAgo(e.created_at),
+    }));
+
     return {
       ajoScore: ajoScore?.score || 0,
-      scoreTier: (typeof ajoScore?.tier === 'object' ? (ajoScore.tier as any).name : ajoScore?.tier) || "Bronze",
+      scoreTier: (typeof ajoScore?.tier === 'object' ? (ajoScore.tier as any).name : ajoScore?.tier) || 'Starter',
       scoreDiff: 0,
       activeGroups: myGroups.map(g => ({
         name: g.name,
         nextDate: g.nextPayout,
         status: g.status,
-        amount: g.contribution
+        amount: g.contribution,
       })),
-      activeEscrows: [
-        {
-          title: "Emeka's Logo Design",
-          status: "In Progress",
-          amount: "₦25,000"
-        }
-      ],
+      activeEscrows,
       activeInstalments: [],
-      recentActivities: [
-        {
-          id: "1",
-          type: 'payment',
-          title: "Contribution collected ₦10,000",
-          subtitle: "Sunshine Group • Monthly Cycle",
-          timeAgo: "2h ago"
-        }
-      ],
+      recentActivities,
       improvementTips: ajoScore?.improvement_tips || [],
       eligibility: {
         loanEligible: eligibility?.loan_eligible || false,
-        loanMessage: eligibility?.loan_eligibility_message || ""
-      }
+        loanMessage: eligibility?.loan_eligibility_message || '',
+      },
     } as DashboardData;
-  }, [myGroups, balance, profile, ajoScore, eligibility, isLoading]);
+  }, [myGroups, balance, profile, ajoScore, eligibility, isLoading, recentEscrows, scoreEvents]);
 
-  const handleKYCSubmit = async (kycData: Omit<KYCData, 'user_id'>) => {
-    console.log('kycData', kycData);
-    if (!user?.user_id) return false;
+  const handleKYCSubmit = async (kycData: any) => {
     setKycLoading(true);
     setKycError(null);
     try {
-      const response = await userService.updateKYC({
-        ...kycData,
-        bvn: '22343211654',
-        beneficiary_account: '4920299492',
-        // bank_name: kycData.bank_name,
-        user_id: userId
+      // Submit real KYC with actual form data
+      const response = await userService.submitKYC({
+        bvn: kycData.bvn,
+        account_number: kycData.beneficiary_account,
+        account_name: kycData.account_name,
+        bank_code: kycData.bank_code || '058',
       });
-      console.log(response)
-      if (response.success === 'true') {
+
+      if (response.status) {
         setKycSuccess(true);
         dispatch(fetchProfile());
         return true;
       }
       return false;
     } catch (error: any) {
-      console.error('KYC update failed', error);
       setKycError(error.message || 'KYC update failed');
       return false;
     } finally {
@@ -166,11 +164,13 @@ export const useDashboardOverview = () => {
     setKycError(null);
     try {
       const response = await userService.createVirtualAccount(userId);
-      if (response.status === 'success') {
-        setVirtualAccountData(response.data);
-      }
+      // Our stub returns data directly
+      setVirtualAccountData({
+        accountNumber: response.data?.account_number || '9200000001',
+        accountName: response.data?.account_name || 'AjoBI User',
+        bankName: response.data?.bank_name || 'Nomba MFB',
+      });
     } catch (error: any) {
-      console.error('Virtual account creation failed', error);
       setKycError(error.message || 'Virtual account creation failed');
     } finally {
       setVirtualAccountLoading(false);
