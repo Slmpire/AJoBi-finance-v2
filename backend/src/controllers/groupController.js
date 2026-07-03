@@ -424,4 +424,7 @@ module.exports = {
   getGroupPayments,
   setupDebit,
   listBankCodes,
+  browseGroups,
+  matchGroup,
+  simulatePayout,
 };
