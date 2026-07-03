@@ -46,3 +46,44 @@ npm run dev
 ### Environment Variables
 
 **Backend `.env`:**
+PORT=5000
+DB_URL=your_supabase_connection_string
+JWT_SECRET=your_jwt_secret
+NOMBA_BASE_URL=https://sandbox.nomba.com
+NOMBA_CLIENT_ID=your_nomba_client_id
+NOMBA_CLIENT_SECRET=your_nomba_client_secret
+NOMBA_PARENT_ACCOUNT_ID=your_parent_account_id
+NOMBA_SUB_ACCOUNT_ID=your_sub_account_id
+NOMBA_WEBHOOK_SECRET=your_webhook_secret
+GEMINI_API_KEY=your_gemini_api_key
+FRONTEND_URL=http://localhost:3000
+
+**Frontend `.env.local`:**
+NEXT_PUBLIC_API_URL=http://localhost:5000
+NEXT_PUBLIC_USE_MOCK_API=false
+
+### Demo Credentials
+
+Run the seed script first:
+```bash
+cd backend && node seed.js
+```
+
+Then login with:
+- **Email:** demo@ajobi.com
+- **Password:** demo1234
+- **Admin:** admin@ajobi.com / AjoBI2024!
+
+## API Endpoints
+
+| Feature | Base Path |
+|---|---|
+| Auth | `/api/auth` |
+| Onboarding | `/api/setup` |
+| AjoScore | `/api/ajoscore` |
+| Groups | `/api/groups` |
+| Savings | `/api/savings` |
+| Escrow | `/api/escrow` |
+| User | `/api/user` |
+| Admin | `/api/admin` |
+| Webhooks | `/api/webhooks` |
