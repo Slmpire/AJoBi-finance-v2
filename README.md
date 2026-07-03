@@ -1,7 +1,4 @@
 
----
-
-```markdown
 # AjoBI — Digital Cooperative Savings Platform
 
 > *"Your hustle is your credit history."*
