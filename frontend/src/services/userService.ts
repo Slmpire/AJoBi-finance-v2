@@ -12,6 +12,15 @@ export const userService = {
     const response = await apiClient.get('/api/user/profile');
     return response.data;
   },
+  submitKYC: async (payload: {
+  bvn: string;
+  account_number: string;
+  account_name: string;
+  bank_code: string;
+}) => {
+  const response = await apiClient.post('/api/user/kyc', payload);
+  return response.data;
+},
 
   updateProfile: async (payload: {
     full_name?: string;
