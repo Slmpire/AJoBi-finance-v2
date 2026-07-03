@@ -272,6 +272,149 @@ async function listBankCodes(req, res, next) {
   }
 }
 
+async function browseGroups(req, res, next) {
+  try {
+    const { frequency, min_amount, max_amount } = req.query;
+
+    let query = `
+      SELECT g.*,
+        (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) as member_count,
+        u.full_name as creator_name
+      FROM groups g
+      JOIN users u ON u.id = g.created_by
+      WHERE g.status = 'active'
+        AND (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) < g.max_members
+        AND g.created_by != $1
+    `;
+    const params = [req.user.id];
+
+    if (frequency) {
+      params.push(frequency);
+      query += ` AND g.frequency = $${params.length}`;
+    }
+    if (min_amount) {
+      params.push(min_amount);
+      query += ` AND g.contribution_amount >= $${params.length}`;
+    }
+    if (max_amount) {
+      params.push(max_amount);
+      query += ` AND g.contribution_amount <= $${params.length}`;
+    }
+
+    query += ' ORDER BY g.created_at DESC LIMIT 20';
+
+    const result = await pool.query(query, params);
+    return success(res, result.rows, 'Groups fetched successfully');
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function matchGroup(req, res, next) {
+  try {
+    const { contribution_amount, frequency } = req.body;
+
+    const result = await pool.query(
+      `SELECT g.*,
+         (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) as member_count,
+         u.full_name as creator_name
+       FROM groups g
+       JOIN users u ON u.id = g.created_by
+       WHERE g.status = 'active'
+         AND g.frequency = $1
+         AND g.contribution_amount BETWEEN $2 AND $3
+         AND (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) < g.max_members
+         AND g.created_by != $4
+       ORDER BY ABS(g.contribution_amount - $5)
+       LIMIT 5`,
+      [
+        frequency || 'monthly',
+        (contribution_amount || 5000) * 0.8,
+        (contribution_amount || 5000) * 1.2,
+        req.user.id,
+        contribution_amount || 5000,
+      ]
+    );
+
+    return success(res, result.rows, 'Matched groups found');
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function simulatePayout(req, res, next) {
+  try {
+    const { id } = req.params;
+
+    const groupResult = await pool.query('SELECT * FROM groups WHERE id = $1', [id]);
+    if (groupResult.rows.length === 0) return fail(res, 'Group not found', 404);
+
+    const group = groupResult.rows[0];
+
+    const members = await pool.query(
+      'SELECT * FROM group_members WHERE group_id = $1 ORDER BY rotation_position ASC',
+      [id]
+    );
+
+    // Mark all members as paid for current cycle
+    for (const member of members.rows) {
+      await pool.query(
+        `INSERT INTO group_payments (group_id, user_id, cycle_number, amount, status, paid_at)
+         VALUES ($1, $2, $3, $4, 'paid', NOW())
+         ON CONFLICT DO NOTHING`,
+        [id, member.user_id, group.current_cycle, group.contribution_amount]
+      );
+      await require('../services/ScoreService').updateScore(
+        member.user_id, 2, 'Paid Ajo group contribution on time', 'group_payment'
+      );
+    }
+
+    // Find recipient
+    const recipientPosition = ((group.current_cycle - 1) % members.rows.length) + 1;
+    const recipient = members.rows.find(m => m.rotation_position === recipientPosition);
+    const totalPot = parseFloat(group.contribution_amount) * members.rows.length;
+
+    // Record disbursement
+    const transferRef = `PAYOUT-GRP-${id}-CYC-${group.current_cycle}-SIM`;
+    await pool.query(
+      `INSERT INTO group_disbursements
+         (group_id, recipient_user_id, cycle_number, amount, nomba_transfer_id, status, disbursed_at)
+       VALUES ($1, $2, $3, $4, $5, 'completed', NOW())
+       ON CONFLICT DO NOTHING`,
+      [id, recipient?.user_id, group.current_cycle, totalPot, transferRef]
+    );
+
+    // Advance cycle
+    await pool.query(
+      `UPDATE groups
+       SET current_cycle = current_cycle + 1,
+           next_collection_date = CASE frequency
+             WHEN 'weekly' THEN next_collection_date + INTERVAL '7 days'
+             WHEN 'biweekly' THEN next_collection_date + INTERVAL '14 days'
+             WHEN 'monthly' THEN next_collection_date + INTERVAL '1 month'
+           END
+       WHERE id = $1`,
+      [id]
+    );
+
+    const recipientUser = recipient
+      ? await pool.query('SELECT full_name FROM users WHERE id = $1', [recipient.user_id])
+      : null;
+
+    return success(res, {
+      cycle_completed: group.current_cycle,
+      total_pot: totalPot,
+      recipient: recipientUser?.rows[0]?.full_name || 'Unknown',
+      recipient_user_id: recipient?.user_id,
+      next_cycle: group.current_cycle + 1,
+      members_paid: members.rows.length,
+      note: 'This is a simulation for demo purposes',
+    }, 'Payout simulated successfully');
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   createGroup,
   joinGroup,
