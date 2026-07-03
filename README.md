@@ -758,7 +758,3 @@ MIT
 
 *Built for the DevCareer x Nomba Hackathon 2026*
 ```
-
----
-
-Paste that into `~/AJoBi-finance-v2/README.md`. It covers everything a judge, teammate, or future contributor needs to understand, run, and extend the project.
