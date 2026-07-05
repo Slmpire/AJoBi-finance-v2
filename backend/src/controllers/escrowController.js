@@ -56,11 +56,12 @@ async function createEscrow(req, res, next) {
     );
 
     return success(res, {
-      escrow: result.rows[0],
-      checkout_link: checkout.checkoutLink,
-      payment_link: `${process.env.FRONTEND_URL}/pay/${paymentCode}`,
-      share_message: `You have been requested to pay ₦${amount} for "${description}". Pay securely here: ${process.env.FRONTEND_URL}/pay/${paymentCode}`,
-    }, 'Escrow created successfully', 201);
+  escrow: result.rows[0],
+  escrow_id: result.rows[0].id,
+  checkout_link: checkout.checkoutLink,
+  payment_link: `${process.env.FRONTEND_URL}/pay/${paymentCode}`,
+  share_message: `You have been requested to pay ₦${amount} for "${description}". Pay securely here: ${process.env.FRONTEND_URL}/pay/${paymentCode}`,
+}, 'Escrow created successfully', 201);
   } catch (err) {
     next(err);
   }
