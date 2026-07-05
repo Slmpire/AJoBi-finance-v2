@@ -16,6 +16,7 @@ export interface SetupDebitPayload {
   bank_code: string;
 }
 
+
 export const groupsService = {
   createGroup: async (payload: CreateGroupPayload) => {
     const response = await apiClient.post('/api/groups/create', payload);
@@ -52,15 +53,25 @@ export const groupsService = {
     return response.data;
   },
 
+  getGroupContributionHistory: async (groupId: string) => {
+    const response = await apiClient.get(`/api/groups/${groupId}/payments`);
+    return response.data;
+  },
+
+  initiateGroupPayment: async (_userId: any, groupId: string) => {
+    const response = await apiClient.post(`/api/groups/${groupId}/setup-debit`);
+    return response.data;
+  },
+
   getBankCodes: async () => {
     const response = await apiClient.get('/api/groups/banks');
     return response.data;
   },
   autoMatchGroup: async (payload: { contribution_amount: number; frequency?: string }) => {
-  const response = await apiClient.post('/api/groups/match', {
-    contribution_amount: payload.contribution_amount,
-    frequency: payload.frequency || 'monthly',
-  });
-  return response.data;
-},
+    const response = await apiClient.post('/api/groups/match', {
+      contribution_amount: payload.contribution_amount,
+      frequency: payload.frequency || 'monthly',
+    });
+    return response.data;
+  },
 };
