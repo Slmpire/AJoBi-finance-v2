@@ -1,7 +1,7 @@
 "use client";
 
 import { use } from "react";
-import { ArrowLeft, ShieldCheck, User, Calendar, CreditCard, Building, Info, ExternalLink, Loader2, FileText } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Calendar, CreditCard, Building, Info, Loader2, FileText } from 'lucide-react';
 import Link from 'next/link';
 import { useEscrowDetail } from './model/useEscrowDetail';
 
@@ -38,6 +38,45 @@ export default function EscrowDetailsPage({ params }: { params: Promise<{ id: st
     );
   }
 
+  const paymentLink = (escrow as any).checkoutLink && (escrow as any).checkoutLink !== '#'
+    ? (escrow as any).checkoutLink
+    : `${typeof window !== 'undefined' ? window.location.origin : ''}/pay/${escrow.paymentReference}`;
+
+  const shareMessage = `You have been requested to pay ₦${escrow.amount.toLocaleString()} for "${escrow.description}". Pay securely here: ${paymentLink}`;
+
+  const handleConfirm = async () => {
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/escrow/${escrow.id}/confirm`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      const data = await response.json();
+      if (data.status) {
+        alert(data.message);
+        window.location.reload();
+      } else {
+        alert(data.message || 'Confirmation failed');
+      }
+    } catch (e) {
+      alert('An error occurred. Please try again.');
+    }
+  };
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(paymentLink);
+    alert('Payment link copied!');
+  };
+
+  const handleWhatsApp = () => {
+    window.open(`https://wa.me/?text=${encodeURIComponent(shareMessage)}`, '_blank');
+  };
+
   return (
     <div className="mx-auto space-y-8 pb-12">
       {/* Header */}
@@ -59,7 +98,9 @@ export default function EscrowDetailsPage({ params }: { params: Promise<{ id: st
             </span>
           )}
           <span className={`px-4 py-2 rounded-xl text-[12px] font-bold uppercase tracking-widest ${
-            escrow.status === 'Funded' ? 'bg-[#EEF8F3] text-[#066B44]' : 'bg-[#FFF9E5] text-[#B78103]'
+            escrow.status === 'Funded' ? 'bg-[#EEF8F3] text-[#066B44]' :
+            escrow.status === 'Completed' ? 'bg-blue-50 text-blue-600' :
+            'bg-[#FFF9E5] text-[#B78103]'
           }`}>
             {escrow.status}
           </span>
@@ -96,9 +137,9 @@ export default function EscrowDetailsPage({ params }: { params: Promise<{ id: st
 
             <div className="grid grid-cols-2 gap-4">
               <div className="p-4 bg-[#F1F6F3] rounded-2xl space-y-1">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Completion Date</p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Created</p>
                 <p className="text-[14px] font-bold text-gray-900 flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-[#066B44]" /> {escrow.expectedCompletionDate}
+                  <Calendar className="w-4 h-4 text-[#066B44]" /> {escrow.createdAt}
                 </p>
               </div>
               <div className="p-4 bg-[#F1F6F3] rounded-2xl space-y-1">
@@ -118,12 +159,44 @@ export default function EscrowDetailsPage({ params }: { params: Promise<{ id: st
                   <CreditCard className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold">Escrow Funding</h2>
-                  <p className="text-sm text-white/70 font-medium">Choose your preferred payment method.</p>
+                  <h2 className="text-xl font-bold">Escrow Payment</h2>
+                  <p className="text-sm text-white/70 font-medium">
+                    {escrow.status === 'Funded'
+                      ? 'Payment received. Waiting for both parties to confirm.'
+                      : 'Share this link with the payer. They do not need an AjoBI account.'}
+                  </p>
                 </div>
               </div>
 
-              {escrow.virtualAccount ? (
+              {escrow.status === 'Funded' ? (
+                <div className="bg-white/10 rounded-2xl p-6 border border-white/10 space-y-4">
+                  <p className="text-xs font-bold uppercase tracking-widest opacity-70">Payment Received</p>
+                  <p className="text-white/80 text-sm font-medium">
+                    ₦{escrow.amount.toLocaleString()} has been received and is held securely.
+                    Both parties must confirm before funds are released.
+                  </p>
+                  <button
+                    onClick={handleConfirm}
+                    className="w-full bg-white text-[#066B44] py-4 rounded-2xl font-bold text-[16px] flex items-center justify-center gap-2 hover:bg-gray-50 transition-all active:scale-[0.98]"
+                  >
+                    Confirm & Release Funds
+                  </button>
+                  <div className="grid grid-cols-2 gap-3 pt-2">
+                    <div className="bg-white/10 rounded-xl p-3 text-center">
+                      <p className="text-[10px] uppercase tracking-widest opacity-60 font-bold">You</p>
+                      <p className={`text-sm font-bold mt-1 ${escrow.confirmationStatus.creatorConfirmed ? 'text-green-300' : 'text-white/60'}`}>
+                        {escrow.confirmationStatus.creatorConfirmed ? '✓ Confirmed' : 'Pending'}
+                      </p>
+                    </div>
+                    <div className="bg-white/10 rounded-xl p-3 text-center">
+                      <p className="text-[10px] uppercase tracking-widest opacity-60 font-bold">Other Party</p>
+                      <p className={`text-sm font-bold mt-1 ${escrow.confirmationStatus.counterpartyConfirmed ? 'text-green-300' : 'text-white/60'}`}>
+                        {escrow.confirmationStatus.counterpartyConfirmed ? '✓ Confirmed' : 'Pending'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : escrow.virtualAccount ? (
                 <div className="bg-white/10 rounded-2xl p-6 border border-white/10 backdrop-blur-md space-y-4">
                   <p className="text-xs font-bold uppercase tracking-widest opacity-70">Pay via Bank Transfer</p>
                   <div className="grid grid-cols-2 gap-6">
@@ -142,23 +215,46 @@ export default function EscrowDetailsPage({ params }: { params: Promise<{ id: st
                   </div>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  <a 
-                    href={escrow.squadPaymentLink} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="w-full bg-white text-[#066B44] py-4 rounded-2xl font-bold text-[16px] flex items-center justify-center gap-2 hover:bg-gray-50 transition-all active:scale-[0.98]"
-                  >
-                    Pay Now with Squad <ExternalLink className="w-4 h-4" />
-                  </a>
-                  
-                  <div className="relative flex items-center gap-4 py-2">
+                <div className="space-y-4">
+                <div className="bg-white/10 rounded-2xl p-5 border border-white/10 space-y-4">
+  <p className="text-xs font-bold uppercase tracking-widest opacity-70">Payment Link</p>
+  <div className="bg-white/10 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+    <div className="flex items-center gap-2 min-w-0">
+      <ShieldCheck className="w-4 h-4 text-green-300 shrink-0" />
+      <span className="text-white font-bold text-sm truncate">
+        Secure AjoBI Payment Link
+      </span>
+    </div>
+    <span className="text-white/50 text-xs font-bold shrink-0">
+      ₦{escrow.amount.toLocaleString()}
+    </span>
+  </div>
+  <div className="flex gap-3">
+    <button
+      onClick={handleCopyLink}
+      className="flex-1 bg-white text-[#066B44] py-3 rounded-xl font-bold text-[13px] hover:bg-gray-50 transition-all active:scale-[0.98]"
+    >
+      📋 Copy Link
+    </button>
+    <button
+      onClick={handleWhatsApp}
+      className="flex-1 bg-[#25D366] text-white py-3 rounded-xl font-bold text-[13px] hover:bg-[#20b858] transition-all active:scale-[0.98]"
+    >
+      WhatsApp
+    </button>
+  </div>
+  <p className="text-white/40 text-[11px] text-center font-medium">
+    Payer does not need an AjoBI account
+  </p>
+</div>
+
+                  <div className="relative flex items-center gap-4 py-1">
                     <div className="flex-1 h-px bg-white/20" />
                     <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">OR</span>
                     <div className="flex-1 h-px bg-white/20" />
                   </div>
 
-                  <button 
+                  <button
                     onClick={handleCreateVirtualAccount}
                     disabled={isCreatingVA}
                     className="w-full bg-white/10 border border-white/20 text-white py-4 rounded-2xl font-bold text-[16px] flex items-center justify-center gap-2 hover:bg-white/20 transition-all active:scale-[0.98] disabled:opacity-50"
@@ -168,7 +264,7 @@ export default function EscrowDetailsPage({ params }: { params: Promise<{ id: st
                     ) : (
                       <>
                         <Building className="w-5 h-5" />
-                        Generate Dedicated Virtual Account
+                        Generate Virtual Account Instead
                       </>
                     )}
                   </button>
@@ -198,7 +294,7 @@ export default function EscrowDetailsPage({ params }: { params: Promise<{ id: st
                 <span className="text-sm font-black text-[#066B44]">{escrow.counterparty.ajoScore}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Status</span>
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Tier</span>
                 <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full uppercase tracking-tighter">
                   {escrow.counterparty.scoreTier}
                 </span>
@@ -206,7 +302,7 @@ export default function EscrowDetailsPage({ params }: { params: Promise<{ id: st
             </div>
           </div>
 
-          {/* Intelligence Widget */}
+          {/* Trust Insight Widget */}
           <div className="bg-[#F9FBFA] rounded-[32px] p-6 border border-[#F1F6F3] space-y-4">
             <div className="flex items-center gap-2 text-gray-900 font-bold text-sm">
               <Info className="w-4 h-4 text-[#066B44]" /> AI Trust Insight

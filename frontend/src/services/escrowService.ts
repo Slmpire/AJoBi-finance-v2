@@ -37,4 +37,8 @@ export const escrowService = {
   const response = await apiClient.get('/api/escrow/mine');
   return response.data;
 },
+generateVirtualAccount: async (escrowId: string | number) => {
+  const response = await apiClient.post(`/api/escrow/${escrowId}/virtual-account`);
+  return response.data;
+},
 };
