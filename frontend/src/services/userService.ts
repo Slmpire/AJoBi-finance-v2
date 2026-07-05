@@ -64,4 +64,9 @@ export const userService = {
   return response.data;
 },
 
+createUserVirtualAccount: async () => {
+  const response = await apiClient.post('/api/user/virtualaccounts');
+  return response.data;
+},
+
 };
