@@ -77,22 +77,40 @@ export const useDashboardOverview = () => {
 
   const isLoading = groupsLoading || savingsLoading || settingsLoading || scoreLoading;
 
-  useEffect(() => {
-    dispatch(fetchMyGroups(userId));
-    dispatch(fetchSavingsOverview());
-    dispatch(fetchProfile());
-    dispatch(fetchAjoScore(userId));
-    dispatch(fetchEligibility(userId));
+ useEffect(() => {
+  dispatch(fetchMyGroups(userId));
+  dispatch(fetchSavingsOverview());
+  dispatch(fetchProfile());
+  dispatch(fetchAjoScore(userId));
+  dispatch(fetchEligibility(userId));
 
-    // Fetch real escrows and score events
-    escrowService.getMyEscrows().then(res => {
-      if (res.status && res.data) setRecentEscrows(res.data.slice(0, 3));
-    }).catch(() => {});
+  // Fetch real escrows and score events
+  escrowService.getMyEscrows().then(res => {
+    if (res.status && res.data) setRecentEscrows(res.data.slice(0, 3));
+  }).catch(() => {});
 
-    scoreService.getScoreEvents(5, 0).then(res => {
-      if (res.status && res.data) setScoreEvents(res.data);
-    }).catch(() => {});
-  }, [dispatch, userId]);
+  scoreService.getScoreEvents(5, 0).then(res => {
+    if (res.status && res.data) setScoreEvents(res.data);
+  }).catch(() => {});
+
+  // Load existing virtual account from backend
+  userService.getVirtualAccountData().then(res => {
+    if (res.status && res.data) {
+      setVirtualAccountData({
+        accountNumber: res.data.account_number,
+        accountName: res.data.account_name,
+        bankName: res.data.bank_name,
+      });
+    }
+  }).catch(() => {});
+
+  // Load KYC status from profile
+  userService.getProfile().then(res => {
+    if (res.status && res.data?.bvn) {
+      setKycSuccess(true);
+    }
+  }).catch(() => {});
+}, [dispatch, userId]);
 
   const data = useMemo(() => {
     if (!ajoScore && isLoading) return null;
