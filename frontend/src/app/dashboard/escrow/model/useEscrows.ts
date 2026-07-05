@@ -5,7 +5,7 @@ import { useAppSelector } from '@/store';
 export interface EscrowItem {
   id: string;
   category: 'Employment' | 'Purchase' | 'Instalment';
-  status: 'Funded' | 'Awaiting Confirmation' | 'Disputed' | 'Released' | 'Completed';
+  status: 'Funded' | 'Awaiting Confirmation' | 'Disputed' | 'Released' | 'Completed' | 'Awaiting Payment';
   userName: string;
   userAvatar: string;
   ajoScore: number;
@@ -16,13 +16,24 @@ export interface EscrowItem {
   actionLabel: string;
 }
 
+function mapStatus(status: string): EscrowItem['status'] {
+  const map: Record<string, EscrowItem['status']> = {
+    awaiting_payment: 'Awaiting Payment',
+    funded: 'Funded',
+    awaiting_confirmation: 'Awaiting Confirmation',
+    released: 'Released',
+    disputed: 'Disputed',
+    refunded: 'Released',
+  };
+  return map[status] || 'Awaiting Payment';
+}
+
 export const useEscrows = () => {
   const [activeFilter, setActiveFilter] = useState('All Escrows');
   const [searchQuery, setSearchQuery] = useState('');
-
   const user = useAppSelector((state) => state.auth.user);
   const userId = user?.user_id || (typeof window !== 'undefined' ? localStorage.getItem('userId') : null);
-  
+
   const [escrows, setEscrows] = useState<EscrowItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -31,24 +42,21 @@ export const useEscrows = () => {
       if (!userId) return;
       setIsLoading(true);
       try {
-        const response = await escrowService.getUserEscrows(userId, {
-          type: 'payment',
-          status: 'pending_funding'
-        });
+        const response = await escrowService.getMyEscrows();
 
-        if (response.success && response.data && Array.isArray(response.data.escrows)) {
-          const mapped: EscrowItem[] = response.data.escrows.map((item: any) => ({
-            id: item.escrow_id,
-            category: item.type === 'payment' ? 'Purchase' : (item.type || 'Purchase'), // Mapping 'payment' to our UI category
-            status: item.status === 'pending_funding' ? 'Funded' : (item.status || 'Funded'), // Simple mapping for now
-            userName: item.counterparty_name || 'Counterparty',
-            userAvatar: `https://i.pravatar.cc/150?u=${item.escrow_id}`, // Using escrow_id as seed for avatar
-            ajoScore: item.counterparty_score || 0,
-            scoreTier: item.counterparty_score >= 700 ? 'Gold Tier' : item.counterparty_score >= 500 ? 'Silver Tier' : 'Bronze Tier',
-            title: item.description || 'No Description',
+        if (response.status && response.data && Array.isArray(response.data)) {
+          const mapped: EscrowItem[] = response.data.map((item: any) => ({
+            id: String(item.id),
+            category: 'Purchase',
+            status: mapStatus(item.status),
+            userName: item.creator_name || item.recipient_name || 'Counterparty',
+            userAvatar: `https://i.pravatar.cc/150?u=${item.id}`,
+            ajoScore: 0,
+            scoreTier: 'Starter',
+            title: item.description || 'Escrow transaction',
             amount: parseFloat(item.amount) || 0,
             createdAt: new Date(item.created_at).toLocaleDateString(),
-            actionLabel: 'View Details'
+            actionLabel: 'View Details',
           }));
           setEscrows(mapped);
         }
@@ -62,12 +70,25 @@ export const useEscrows = () => {
     fetchEscrows();
   }, [userId, activeFilter]);
 
+  const filteredEscrows = escrows.filter(e => {
+    if (activeFilter === 'All Escrows') return true;
+    if (activeFilter === 'As Buyer / Employer') return true;
+    if (activeFilter === 'As Seller / Worker') return true;
+    if (activeFilter === 'Completed') return e.status === 'Released';
+    if (activeFilter === 'Disputed') return e.status === 'Disputed';
+    return true;
+  }).filter(e =>
+    searchQuery === '' ||
+    e.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    e.userName.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return {
-    escrows,
+    escrows: filteredEscrows,
     isLoading,
     activeFilter,
     setActiveFilter,
     searchQuery,
-    setSearchQuery
+    setSearchQuery,
   };
 };
