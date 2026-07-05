@@ -149,11 +149,63 @@ async function getVirtualAccount(req, res, next) {
       [req.user.id]
     );
 
-    if (result.rows.length === 0) {
-      return success(res, null, 'No virtual account found');
+    if (result.rows.length > 0) {
+      return success(res, result.rows[0], 'Virtual account fetched');
     }
 
-    return success(res, result.rows[0], 'Virtual account fetched');
+    return success(res, null, 'No virtual account found');
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function createVirtualAccount(req, res, next) {
+  try {
+    const existing = await pool.query(
+      'SELECT * FROM virtual_accounts WHERE user_id = $1',
+      [req.user.id]
+    );
+
+    if (existing.rows.length > 0) {
+      return success(res, existing.rows[0], 'Virtual account already exists');
+    }
+
+    const userResult = await pool.query(
+      'SELECT * FROM users WHERE id = $1',
+      [req.user.id]
+    );
+    const user = userResult.rows[0];
+
+    const accountRef = `AJOBI-USR-${req.user.id}-${Date.now()}`;
+
+    const NombaService = require('../services/NombaService');
+    const account = await NombaService.createVirtualAccount({
+      accountRef,
+      accountName: user.full_name,
+      bvn: user.bvn || '00000000000',
+      currency: 'NGN',
+    });
+
+    await pool.query(
+      `INSERT INTO virtual_accounts
+         (user_id, account_number, account_name, bank_name, bank_code, account_ref)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        req.user.id,
+        account.bankAccountNumber || account.accountNumber,
+        account.accountName || user.full_name,
+        account.bankName || 'Nomba MFB',
+        account.bankCode || '000026',
+        accountRef,
+      ]
+    );
+
+    const saved = await pool.query(
+      'SELECT * FROM virtual_accounts WHERE user_id = $1',
+      [req.user.id]
+    );
+
+    return success(res, saved.rows[0], 'Virtual account created successfully');
   } catch (err) {
     next(err);
   }
