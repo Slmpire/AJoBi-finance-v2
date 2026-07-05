@@ -62,6 +62,7 @@ export default function GroupDetailsPage({ params }: { params: Promise<{ id: str
             virtualAccount={virtualAccount}
             onPayment={handleInitiatePayment}
             isPaying={isPaying} 
+            inviteCode={groupInfo.inviteCode}
           />
 
           <RotationTracker 
