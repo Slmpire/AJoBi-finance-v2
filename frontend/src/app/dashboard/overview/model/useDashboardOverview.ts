@@ -92,17 +92,37 @@ export const useDashboardOverview = () => {
     if (res.status && res.data) setScoreEvents(res.data);
   }).catch(() => {});
 
-  // Load virtual account — if exists, show it directly
-  userService.getVirtualAccountData().then((res: any) => {
-    if (res.status && res.data) {
-      setVirtualAccountData({
-        accountNumber: res.data.account_number,
-        accountName: res.data.account_name,
-        bankName: res.data.bank_name,
-      });
-      setKycSuccess(true);
-    }
-  }).catch(() => {});
+// Load virtual account — if exists, show it directly
+userService.getVirtualAccountData().then((res: any) => {
+  if (res.status && res.data) {
+    setVirtualAccountData({
+      accountNumber: res.data.account_number,
+      accountName: res.data.account_name,
+      bankName: res.data.bank_name,
+    });
+    setKycSuccess(true);
+  } else {
+    // No virtual account yet — check if BVN exists and auto-create
+    userService.getProfile().then(async (profileRes: any) => {
+      if (profileRes.status && profileRes.data?.bvn) {
+        setKycSuccess(true);
+        // Auto-create virtual account in background
+        try {
+          const vaRes = await userService.createUserVirtualAccount();
+          if (vaRes.status && vaRes.data) {
+            setVirtualAccountData({
+              accountNumber: vaRes.data.account_number,
+              accountName: vaRes.data.account_name,
+              bankName: vaRes.data.bank_name,
+            });
+          }
+        } catch (e) {
+          // Will show "Generate" button instead
+        }
+      }
+    }).catch(() => {});
+  }
+}).catch(() => {});
 
   // If no virtual account, check if KYC was already submitted (BVN exists)
   userService.getProfile().then((res: any) => {
