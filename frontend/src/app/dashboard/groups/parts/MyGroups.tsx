@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { GroupItem } from "../model/useGroups";
 
 export default function MyGroups({ groups }: { groups: GroupItem[] }) {
@@ -13,11 +14,29 @@ export default function MyGroups({ groups }: { groups: GroupItem[] }) {
     }
   };
 
+  if (groups.length === 0) {
+    return (
+      <div className="text-center py-20 space-y-4">
+        <p className="text-gray-400 font-medium text-[15px]">You have not joined any groups yet.</p>
+        <Link
+          href="/dashboard/groups/create"
+          className="inline-flex items-center gap-2 bg-[#066B44] text-white px-6 py-3 rounded-xl text-[13px] font-bold"
+        >
+          Create your first group
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {groups.map((group) => (
-          <div key={group.id} className="bg-white rounded-[24px] p-6 border border-[#E8EFE8] shadow-sm relative flex flex-col justify-between h-full hover:shadow-md transition-shadow duration-200">
+          <Link
+            key={group.id}
+            href={`/dashboard/groups/${group.id}`}
+            className="bg-white rounded-[24px] p-6 border border-[#E8EFE8] shadow-sm relative flex flex-col justify-between h-full hover:shadow-md hover:border-[#066B44]/30 transition-all duration-200 cursor-pointer"
+          >
             <div>
               <div className="flex justify-between items-start mb-4">
                 <div>
@@ -28,9 +47,9 @@ export default function MyGroups({ groups }: { groups: GroupItem[] }) {
                   {group.status}
                 </span>
               </div>
-              
+
               <h3 className="text-[28px] font-black text-[#066B44] mb-6 tracking-tight">{group.contribution}</h3>
-              
+
               <div className="grid grid-cols-2 gap-4 py-4 border-t border-b border-[#E8EFE8] mb-6">
                 <div>
                   <p className="text-[10px] font-extrabold text-gray-400 uppercase">
@@ -55,12 +74,12 @@ export default function MyGroups({ groups }: { groups: GroupItem[] }) {
                   </div>
                 ))}
                 <div className="w-7 h-7 rounded-full border-2 border-white bg-[#F1F6F3] flex items-center justify-center text-[10px] font-extrabold text-[#066B44]">
-                  +{group.members - group.avatars.length}
+                  +{Math.max(0, group.members - group.avatars.length)}
                 </div>
               </div>
               <span className="text-[12px] font-bold text-gray-500">{group.members} members</span>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
     </div>
