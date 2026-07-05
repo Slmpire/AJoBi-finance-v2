@@ -56,4 +56,11 @@ export const groupsService = {
     const response = await apiClient.get('/api/groups/banks');
     return response.data;
   },
+  autoMatchGroup: async (payload: { contribution_amount: number; frequency?: string }) => {
+  const response = await apiClient.post('/api/groups/match', {
+    contribution_amount: payload.contribution_amount,
+    frequency: payload.frequency || 'monthly',
+  });
+  return response.data;
+},
 };
