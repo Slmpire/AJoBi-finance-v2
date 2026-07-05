@@ -187,6 +187,20 @@ async function verifyCheckoutOrder(orderReference) {
   );
   return data.data;
 }
+async function createVirtualAccount({ accountRef, accountName, bvn, currency = 'NGN' }) {
+  const data = await request('POST', '/v1/accounts/virtual', {
+    accountRef,
+    accountName,
+    bvn,
+    currency,
+  });
+  return data.data;
+}
+
+async function getVirtualAccount(accountRef) {
+  const data = await request('GET', `/v1/accounts/virtual/${accountRef}`);
+  return data.data;
+}
 module.exports = {
   getAccessToken,
   request,
@@ -196,4 +210,6 @@ module.exports = {
   transferToBank,
   createCheckoutOrder,
   verifyCheckoutOrder,
+  createVirtualAccount,
+  getVirtualAccount,
 };
