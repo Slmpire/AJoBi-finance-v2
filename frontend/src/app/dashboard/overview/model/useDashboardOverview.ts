@@ -77,65 +77,66 @@ export const useDashboardOverview = () => {
 
   const isLoading = groupsLoading || savingsLoading || settingsLoading || scoreLoading;
 
- useEffect(() => {
-  dispatch(fetchMyGroups(userId));
-  dispatch(fetchSavingsOverview());
-  dispatch(fetchProfile());
-  dispatch(fetchAjoScore(userId));
-  dispatch(fetchEligibility(userId));
+  useEffect(() => {
+    dispatch(fetchMyGroups(userId));
+    dispatch(fetchSavingsOverview());
+    dispatch(fetchProfile());
+    dispatch(fetchAjoScore(userId));
+    dispatch(fetchEligibility(userId));
 
-  escrowService.getMyEscrows().then(res => {
-    if (res.status && res.data) setRecentEscrows(res.data.slice(0, 3));
-  }).catch(() => {});
+    escrowService.getMyEscrows().then(res => {
+      if (res.status && res.data) setRecentEscrows(res.data.slice(0, 3));
+    }).catch(() => { });
 
-  scoreService.getScoreEvents(5, 0).then(res => {
-    if (res.status && res.data) setScoreEvents(res.data);
-  }).catch(() => {});
+    scoreService.getScoreEvents(5, 0).then(res => {
+      if (res.status && res.data) setScoreEvents(res.data);
+    }).catch(() => { });
 
-// Load virtual account — if exists, show it directly
-userService.getVirtualAccountData().then((res: any) => {
-  if (res.status && res.data) {
-    setVirtualAccountData({
-      accountNumber: res.data.account_number,
-      accountName: res.data.account_name,
-      bankName: res.data.bank_name,
-    });
-    setKycSuccess(true);
-  } else {
-    // No virtual account yet — check if BVN exists and auto-create
-    userService.getProfile().then(async (profileRes: any) => {
-      if (profileRes.status && profileRes.data?.bvn) {
+    // Load virtual account — if exists, show it directly
+    userService.getVirtualAccountData().then((res: any) => {
+      if (res.status && res.data) {
+        setVirtualAccountData({
+          accountNumber: res.data.account_number,
+          accountName: res.data.account_name,
+          bankName: res.data.bank_name,
+        });
         setKycSuccess(true);
-        // Auto-create virtual account in background
-        try {
-          const vaRes = await userService.createUserVirtualAccount();
-          if (vaRes.status && vaRes.data) {
-            setVirtualAccountData({
-              accountNumber: vaRes.data.account_number,
-              accountName: vaRes.data.account_name,
-              bankName: vaRes.data.bank_name,
-            });
+      } else {
+        // No virtual account yet — check if BVN exists and auto-create
+        userService.getProfile().then(async (profileRes: any) => {
+          if (profileRes.status && profileRes.data?.bvn) {
+            setKycSuccess(true);
+            // Auto-create virtual account in background
+            try {
+              const vaRes = await userService.createUserVirtualAccount();
+              if (vaRes.status && vaRes.data) {
+                setVirtualAccountData({
+                  accountNumber: vaRes.data.account_number,
+                  accountName: vaRes.data.account_name,
+                  bankName: vaRes.data.bank_name,
+                });
+              }
+            } catch (e) {
+              // Will show "Generate" button instead
+            }
           }
-        } catch (e) {
-          // Will show "Generate" button instead
-        }
+        }).catch(() => { });
       }
-    }).catch(() => {});
-  }
-}).catch(() => {});
+    }).catch(() => { });
 
-  // If no virtual account, check if KYC was already submitted (BVN exists)
-  userService.getProfile().then((res: any) => {
-    if (res.status && res.data?.bvn) {
-      setKycSuccess(true);
-    }
-  }).catch(() => {});
-}, [dispatch, userId]);
+    // If no virtual account, check if KYC was already submitted (BVN exists)
+    userService.getProfile().then((res: any) => {
+      if (res.status && res.data?.bvn) {
+        setKycSuccess(true);
+      }
+    }).catch(() => { });
+  }, [dispatch, userId]);
 
   const data = useMemo(() => {
     if (!ajoScore && isLoading) return null;
 
     const activeEscrows = recentEscrows.map((e: any) => ({
+      id: String(e.id),
       title: e.description || 'Escrow transaction',
       status: e.status === 'funded' ? 'Funded' : e.status === 'released' ? 'Released' : 'Pending',
       amount: `₦${parseFloat(e.amount).toLocaleString()}`,
@@ -154,6 +155,7 @@ userService.getVirtualAccountData().then((res: any) => {
       scoreTier: (typeof ajoScore?.tier === 'object' ? (ajoScore.tier as any).name : ajoScore?.tier) || 'Starter',
       scoreDiff: 0,
       activeGroups: myGroups.map(g => ({
+        id: g.id,
         name: g.name,
         nextDate: g.nextPayout,
         status: g.status,
@@ -196,23 +198,23 @@ userService.getVirtualAccountData().then((res: any) => {
     }
   };
 
- const handleCreateVirtualAccount = async () => {
-  if (!userId) return;
-  setVirtualAccountLoading(true);
-  setKycError(null);
-  try {
-    const response = await userService.createVirtualAccount(userId) as any;
-    setVirtualAccountData({
-      accountNumber: response?.data?.account_number || '9200000001',
-      accountName: response?.data?.account_name || 'AjoBI User',
-      bankName: response?.data?.bank_name || 'Nomba MFB',
-    });
-  } catch (error: any) {
-    setKycError(error.message || 'Virtual account creation failed');
-  } finally {
-    setVirtualAccountLoading(false);
-  }
-};
+  const handleCreateVirtualAccount = async () => {
+    if (!userId) return;
+    setVirtualAccountLoading(true);
+    setKycError(null);
+    try {
+      const response = await userService.createVirtualAccount(userId) as any;
+      setVirtualAccountData({
+        accountNumber: response?.data?.account_number || '9200000001',
+        accountName: response?.data?.account_name || 'AjoBI User',
+        bankName: response?.data?.bank_name || 'Nomba MFB',
+      });
+    } catch (error: any) {
+      setKycError(error.message || 'Virtual account creation failed');
+    } finally {
+      setVirtualAccountLoading(false);
+    }
+  };
 
   return {
     isLoading,
