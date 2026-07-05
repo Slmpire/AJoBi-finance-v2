@@ -5,17 +5,20 @@ import Link from "next/link";
 
 interface ActiveOverviewProps {
   groups: {
+    id?: string;
     name: string;
     nextDate: string;
     status: string;
     amount: string;
   }[];
   escrows: {
+    id?: string;
     title: string;
     status: string;
     amount: string;
   }[];
   instalments: {
+    id?: string;
     item: string;
     progress: number;
     paid: string;
@@ -26,9 +29,12 @@ interface ActiveOverviewProps {
 export default function ActiveOverview({ groups, escrows, instalments }: ActiveOverviewProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-      
+
       {/* Active Ajo Groups */}
-      <div className="bg-white p-6 rounded-[24px] border border-[#E8EFE8] shadow-sm hover:shadow-md transition-shadow duration-200">
+      <Link
+        href={groups[0]?.id ? `/dashboard/groups/${groups[0].id}` : '/dashboard/groups'}
+        className="bg-white p-6 rounded-[24px] border border-[#E8EFE8] shadow-sm hover:shadow-md hover:border-[#066B44]/30 transition-all duration-200 cursor-pointer block"
+      >
         <div className="flex justify-between items-center mb-5">
           <span className="text-[11px] font-extrabold text-gray-400 uppercase tracking-wider">Active Ajo Groups</span>
           <Users className="w-5 h-5 text-[#066B44]" />
@@ -47,7 +53,7 @@ export default function ActiveOverview({ groups, escrows, instalments }: ActiveO
         ) : (
           <div className="py-4 text-[13px] text-gray-500">No active groups found</div>
         )}
-      </div>
+      </Link>
 
       {/* Active Escrows */}
       <div className="bg-white p-6 rounded-[24px] border border-[#E8EFE8] shadow-sm hover:shadow-md transition-shadow duration-200">
@@ -61,7 +67,10 @@ export default function ActiveOverview({ groups, escrows, instalments }: ActiveO
             <p className="text-[12px] text-gray-500 font-medium mb-5">Status: {escrows[0].status}</p>
             <div className="flex justify-between items-end">
               <span className="font-extrabold text-[16px] text-[#066B44]">{escrows[0].amount}</span>
-              <Link href="#" className="text-[12px] font-extrabold text-[#066B44] hover:underline transition-all">
+              <Link
+                href={escrows[0]?.id ? `/dashboard/escrow/${escrows[0].id}` : '/dashboard/escrow'}
+                className="text-[12px] font-extrabold text-[#066B44] hover:underline transition-all"
+              >
                 View Details
               </Link>
             </div>
@@ -87,13 +96,13 @@ export default function ActiveOverview({ groups, escrows, instalments }: ActiveO
             <div className="py-4 text-[13px] text-gray-500">No active instalments</div>
           )}
         </div>
-        
+
         {instalments.length > 0 && (
           <div className="mt-1">
             <div className="w-full h-2 bg-[#F1F6F3] rounded-full overflow-hidden shadow-inner">
-              <div 
-                className="h-full bg-[#066B44] rounded-full transition-all duration-500" 
-                style={{ width: `${instalments[0].progress}%` }} 
+              <div
+                className="h-full bg-[#066B44] rounded-full transition-all duration-500"
+                style={{ width: `${instalments[0].progress}%` }}
               />
             </div>
             <div className="flex justify-between items-center text-[12px] font-bold mt-2">
@@ -103,7 +112,7 @@ export default function ActiveOverview({ groups, escrows, instalments }: ActiveO
           </div>
         )}
       </div>
-      
+
     </div>
   );
 }
