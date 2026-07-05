@@ -59,4 +59,8 @@ export const userService = {
   createVirtualAccount: async (_userId: string | number) => {
     return { status: 'pending', data: null };
   },
+  getVirtualAccountData: async () => {
+  const response = await apiClient.get('/api/user/virtualaccounts');
+  return response.data;
+},
 };
