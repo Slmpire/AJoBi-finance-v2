@@ -267,6 +267,7 @@ module.exports = {
   getDashboardSummary,
   submitKYC,
   getVirtualAccount,
+  createVirtualAccount,
   createGroupVirtualAccount,
   recordGroupPayment,
 };
