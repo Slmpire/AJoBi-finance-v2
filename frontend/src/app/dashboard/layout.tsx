@@ -39,7 +39,8 @@ export default function DashboardLayout({
     dispatch(logout());
     router.push("/login");
   };
-
+  
+const [showNotifications, setShowNotifications] = useState(false);
   const navItems = [
     { href: "/dashboard", label: "Home", icon: LayoutDashboard },
     { href: "/dashboard/savings", label: "Savings", icon: Wallet },  
@@ -184,10 +185,37 @@ export default function DashboardLayout({
              <h1 className="text-[16px] sm:text-[18px] font-bold text-gray-900 tracking-tight ml-1 sm:ml-0">{getPageTitle()}</h1>
           </div>
           <div className="flex items-center gap-4">
-            <button className="relative w-10 h-10 rounded-full flex items-center justify-center bg-[#F1F6F3] border border-[#E8EFE8] text-[#066B44] hover:scale-105 transition-all shadow-sm">
-              <div className="absolute top-2 right-2.5 w-2 h-2 bg-red-600 rounded-full border border-white animate-pulse" />
-              <Bell className="w-[18px] h-[18px]" strokeWidth={2.5} />
-            </button>
+            <div className="relative">
+  <button
+    onClick={() => setShowNotifications(!showNotifications)}
+    className="relative w-10 h-10 rounded-full flex items-center justify-center bg-[#F1F6F3] border border-[#E8EFE8] text-[#066B44] hover:scale-105 transition-all shadow-sm"
+  >
+    <Bell className="w-[18px] h-[18px]" strokeWidth={2.5} />
+  </button>
+
+  {showNotifications && (
+    <div className="absolute right-0 top-12 w-80 bg-white rounded-2xl shadow-xl border border-[#E8EFE8] z-50 overflow-hidden">
+      <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+        <h3 className="font-bold text-gray-900 text-sm">Notifications</h3>
+        <button
+          onClick={() => setShowNotifications(false)}
+          className="text-gray-400 hover:text-gray-600 text-xs font-bold"
+        >
+          Close
+        </button>
+      </div>
+      <div className="p-6 text-center space-y-2">
+        <div className="w-12 h-12 bg-[#F1F6F3] rounded-full flex items-center justify-center mx-auto">
+          <Bell className="w-5 h-5 text-[#066B44]" />
+        </div>
+        <p className="text-sm font-bold text-gray-700">You're all caught up!</p>
+        <p className="text-xs text-gray-400 font-medium">
+          Notifications for group payments, escrow updates, and score changes will appear here.
+        </p>
+      </div>
+    </div>
+  )}
+</div>
             <Link href="/dashboard/settings" className="w-10 h-10 rounded-full border-2 border-[#066B44] p-[2px] hover:scale-105 transition-transform overflow-hidden shadow-sm">
               <div className="w-full h-full bg-gray-200 rounded-full flex items-center justify-center text-gray-600 relative">
                 <User className="w-4 h-4" />
