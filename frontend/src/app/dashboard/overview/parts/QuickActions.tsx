@@ -1,13 +1,14 @@
 "use client";
 
-import { UserPlus, ShieldCheck, CreditCard } from "lucide-react";
+import { UserPlus, ShieldCheck, CreditCard, PiggyBank } from "lucide-react";
 import Link from "next/link";
 
 export default function QuickActions() {
   const actions = [
-    { label: "Join an Ajo Group", icon: UserPlus, href: "/dashboard/groups", color: "bg-[#F1F6F3] text-[#066B44]" },
-    { label: "Create an Escrow", icon: ShieldCheck, href: "/dashboard/escrow", color: "bg-[#F1F6F3] text-[#066B44]" },
-    { label: "Loan Eligibility", icon: CreditCard, href: "#", color: "bg-[#F1F6F3] text-[#066B44]" },
+    { label: "Join an Ajo Group", icon: UserPlus, href: "/dashboard/groups" },
+    { label: "Create an Escrow", icon: ShieldCheck, href: "/dashboard/escrow" },
+    { label: "Loan Eligibility", icon: CreditCard, href: "/dashboard/score" },
+    { label: "Save Toward Goal", icon: PiggyBank, href: "/dashboard/savings/create" },
   ];
 
   return (
@@ -19,15 +20,15 @@ export default function QuickActions() {
         {actions.map((action, i) => {
           const Icon = action.icon;
           return (
-            <Link 
-              key={i} 
+            <Link
+              key={i}
               href={action.href}
               className="bg-white p-6 rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.01)] border border-[#E8EFE8] flex flex-col items-center justify-center gap-4 hover:shadow-[0_8px_30px_rgb(0,0,0,0.05)] hover:border-[#066B44]/30 hover:-translate-y-0.5 transition-all group"
             >
-              <div className={`w-12 h-12 ${action.color} rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform`}>
+              <div className="w-12 h-12 bg-[#F1F6F3] text-[#066B44] rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
                 <Icon className="w-6 h-6" />
               </div>
-              <span className="text-[13px] font-bold text-gray-800">{action.label}</span>
+              <span className="text-[13px] font-bold text-gray-800 text-center">{action.label}</span>
             </Link>
           );
         })}
