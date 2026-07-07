@@ -80,7 +80,6 @@ export const useGroups = () => {
         contribution_amount: 5000,
         // frequency: matchFrequency.toLowerCase() as 'weekly' | 'monthly',
         frequency: 'weekly',
-        user_id: localStorage.getItem("userId") as string,
       });
       console.log(resp, "resp")
 
