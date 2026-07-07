@@ -24,4 +24,13 @@ export const settingsService = {
     const response = await apiClient.patch('/api/user/beneficiary', payload);
     return response.data;
   },
+  getNotifications: async () => {
+  const response = await apiClient.get('/api/settings/notifications');
+  return response.data;
+},
+
+updateNotifications: async (payload: any) => {
+  const response = await apiClient.put('/api/settings/notifications', payload);
+  return response.data;
+},
 };
