@@ -1,8 +1,14 @@
 import { apiClient } from './apiClient';
 
 export interface CreateEscrowPayload {
+  creator_id: string;
+  type: string;
+  counterparty_id: string;
   amount: number;
   description: string;
+  expected_completion_date: string;
+  listing_id?: string;
+
   recipient_email?: string;
   recipient_phone?: string;
 }
