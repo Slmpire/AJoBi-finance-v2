@@ -35,7 +35,14 @@ app.use('/api/webhooks', webhookRoutes);
 app.use(express.json());
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: true, message: 'AjoBI backend is running', data: null });
+  res.json({ 
+    status: true, 
+    message: 'AjoBI backend is running',
+    db_configured: !!process.env.DB_URL,
+    node_env: process.env.NODE_ENV,
+    port: process.env.PORT,
+    data: null 
+  });
 });
 
 app.use('/api/auth', authRoutes);
