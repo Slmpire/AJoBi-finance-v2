@@ -14,7 +14,7 @@ import TrustLevel from "./parts/TrustLevel";
 export default function GroupDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const { id } = resolvedParams;
-  
+
   const {
     isLoading,
     groupInfo,
@@ -43,13 +43,13 @@ export default function GroupDetailsPage({ params }: { params: Promise<{ id: str
 
   return (
     <div className="w-full mx-auto pb-12">
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start mt-4">
-        
+
         {/* Left: Core Group Data Modules */}
         <div className="lg:col-span-2 space-y-8">
-          
-          <GroupHeader 
+
+          <GroupHeader
             name={groupInfo.name}
             status={groupInfo.status}
             contribution={groupInfo.contribution}
@@ -61,21 +61,21 @@ export default function GroupDetailsPage({ params }: { params: Promise<{ id: str
             isMember={isMember}
             virtualAccount={virtualAccount}
             onPayment={handleInitiatePayment}
-            isPaying={isPaying} 
+            isPaying={isPaying}
             inviteCode={groupInfo.inviteCode}
           />
 
-          <RotationTracker 
+          <RotationTracker
             nextDisbursement={groupInfo.nextDisbursement}
             timeline={rotationTimeline}
           />
 
-          <MembersTable 
+          <MembersTable
             members={members}
             onTimeRate={groupInfo.onTimeRate}
           />
 
-          <ContributionHistory 
+          <ContributionHistory
             history={history}
           />
 
@@ -84,15 +84,20 @@ export default function GroupDetailsPage({ params }: { params: Promise<{ id: str
         {/* Right: User Actions & Status Widgets */}
         <div className="lg:col-span-1">
           <div className="sticky top-24 space-y-6">
-            
-            <StatusWidget 
+
+            <StatusWidget
               paymentStatus={userStatus.paymentStatus}
               paymentMethod={userStatus.paymentMethod}
               methodActive={userStatus.methodActive}
               methodDetails={userStatus.methodDetails}
             />
 
-            <CreatorControls />
+            <CreatorControls
+              inviteCode={groupInfo.inviteCode}
+              memberCount={members.length}
+              maxMembers={groupInfo.totalCycles}
+              groupId={id}
+            />
 
             <TrustLevel />
 
