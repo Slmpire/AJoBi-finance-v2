@@ -90,6 +90,8 @@ export default function GroupDetailsPage({ params }: { params: Promise<{ id: str
               paymentMethod={userStatus.paymentMethod}
               methodActive={userStatus.methodActive}
               methodDetails={userStatus.methodDetails}
+              onPayment={handleInitiatePayment}
+              isPaying={isPaying}
             />
 
             <CreatorControls
