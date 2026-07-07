@@ -74,7 +74,7 @@ export const fetchMyGroups = createAsyncThunk(
 
 export const fetchPublicGroups = createAsyncThunk(
   'groups/fetchPublicGroups',
-  async (_params: any, { rejectWithValue }) => {
+  async (_params: void, { rejectWithValue }) => {
     try {
       // No public groups endpoint yet — return empty
       return [];
