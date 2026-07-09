@@ -8,7 +8,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "AjoBI | Your hustle is your credit history",
+  title: "AjoBI | Your hustle , your credit history",
   description: "AjoBI digitizes Nigeria's traditional Ajo/Esusu cooperative savings system. Save together, grow together — powered by Nomba.",
   manifest: "/manifest.json",
   keywords: ["ajo", "esusu", "cooperative savings", "Nigeria", "fintech", "savings group", "escrow"],
