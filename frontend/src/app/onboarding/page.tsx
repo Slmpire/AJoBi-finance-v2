@@ -4,12 +4,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { User, Phone, Mail, Lock, KeyRound, ShieldCheck, Loader2 } from "lucide-react";
 import { useRegistrationForm } from "@/models/auth/useRegistrationForm";
-import type { Metadata } from "next";
-
-export const metadata: Metadata = {
-  title: "Join AjoBI — Start Saving Cooperatively",
-  description: "Create your free AjoBI account and join Nigeria's digital cooperative savings revolution.",
-};
 
 export default function OnboardingPage() {
   const { register, handleSubmit, errors, isSubmitting, isSuccess } = useRegistrationForm();

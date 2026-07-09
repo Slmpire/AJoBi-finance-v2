@@ -1,7 +1,7 @@
 "use client";
  
 import { useState, useEffect } from "react";
-import type { Metadata } from "next";
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
@@ -19,16 +19,6 @@ import {
 import { useRouter } from "next/navigation";
 import { useAppDispatch } from "@/store";
 import { logout } from "@/store/slices/authSlice";
-
-export const metadata: Metadata = {
-  title: "Dashboard — AjoBI",
-  description: "Manage your Ajo groups, savings goals, and escrow transactions on AjoBI.",
-  openGraph: {
-    title: "AjoBI Dashboard",
-    description: "Manage your cooperative savings, goals, and secure transactions.",
-    images: [{ url: "/images/ajobi_hero.png", width: 1200, height: 630 }],
-  },
-};
 
 export default function DashboardLayout({
   children,
