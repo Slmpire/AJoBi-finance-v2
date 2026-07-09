@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     siteName: "AjoBI",
     images: [
       {
-        url: "/images/ajobi_hero.png",
+        url: "/images/og-image.png",
         width: 1200,
         height: 630,
         alt: "AjoBI — Digital Cooperative Savings Platform",
