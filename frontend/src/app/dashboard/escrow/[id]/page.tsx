@@ -38,9 +38,7 @@ export default function EscrowDetailsPage({ params }: { params: Promise<{ id: st
     );
   }
 
-  const paymentLink = (escrow as any).checkoutLink && (escrow as any).checkoutLink !== '#'
-    ? (escrow as any).checkoutLink
-    : `${typeof window !== 'undefined' ? window.location.origin : ''}/pay/${escrow.paymentReference}`;
+  const paymentLink = `${typeof window !== 'undefined' ? window.location.origin : 'https://ajobi-frontend.vercel.app'}/pay/${escrow.paymentReference}`;
 
   const shareMessage = `You have been requested to pay ₦${escrow.amount.toLocaleString()} for "${escrow.description}". Pay securely here: ${paymentLink}`;
 
