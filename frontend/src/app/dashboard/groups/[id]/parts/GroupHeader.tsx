@@ -44,7 +44,7 @@ export default function GroupHeader({
   const progress = (currentCycle / totalCycles) * 100;
 
   const handleShare = () => {
-    const link = `${window.location.origin}/dashboard/groups?join=${inviteCode || ''}`;
+    const link = `${window.location.origin}/join/${inviteCode || ''}`;
     const message = `Join my AjoBI savings group "${name}"! Contribute ${contribution} on a ${rotation} basis. Use invite code: ${inviteCode || 'N/A'} or click: ${link}`;
     if (navigator.share) {
       navigator.share({ title: `Join ${name}`, text: message, url: link });
