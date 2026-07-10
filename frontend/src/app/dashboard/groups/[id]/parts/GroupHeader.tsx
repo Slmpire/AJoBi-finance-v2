@@ -45,7 +45,7 @@ export default function GroupHeader({
 
   const handleShare = () => {
     const link = `${window.location.origin}/join/${inviteCode || ''}`;
-    const message = `Join my AjoBI savings group "${name}"! Contribute ${contribution} on a ${rotation} basis. Use invite code: ${inviteCode || 'N/A'} or click: ${link}`;
+    const message = `Join my AjoBI savings group "${name}"! Contribute ${contribution} ${rotation}. Click to join directly: ${link} (Code: ${inviteCode || 'N/A'})`;
     if (navigator.share) {
       navigator.share({ title: `Join ${name}`, text: message, url: link });
     } else {
