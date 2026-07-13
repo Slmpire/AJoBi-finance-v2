@@ -86,41 +86,50 @@ export const authService = {
       localStorage.setItem('userId', normalized.data.user_id);
     }
 
+    // Check for pending invite code after login
+    const pendingCode = localStorage.getItem('pending_invite_code');
+    if (pendingCode) {
+      localStorage.removeItem('pending_invite_code');
+      // Redirect to join page after login
+      if (typeof window !== 'undefined') {
+        window.location.href = `/join/${pendingCode}`;
+      }
+    }
     return normalized;
   },
 
-register: async (payload: RegistrationFormValues): Promise<RegisterResponse> => {
-  const response = await apiClient.post('/api/auth/register', {
-    full_name: payload.fullName,
-    phone: payload.phoneNumber,
-    email: payload.email,
-    password: payload.password,
-  });
-  const raw = response.data as any;
-  const d = raw.data || {};
+  register: async (payload: RegistrationFormValues): Promise<RegisterResponse> => {
+    const response = await apiClient.post('/api/auth/register', {
+      full_name: payload.fullName,
+      phone: payload.phoneNumber,
+      email: payload.email,
+      password: payload.password,
+    });
+    const raw = response.data as any;
+    const d = raw.data || {};
 
-  const normalized: RegisterResponse = {
-    status: raw.status,
-    message: raw.message,
-    data: {
-      user_id: String(d.user_id || d.user?.id || d.id || ''),
-      full_name: d.user?.full_name || d.full_name || '',
-      phone: d.user?.phone || d.phone || '',
-      email: d.user?.email || payload.email,
-      token: d.token || '',
-      onboarding_complete: d.onboarding_complete ?? false,
-    },
-  };
+    const normalized: RegisterResponse = {
+      status: raw.status,
+      message: raw.message,
+      data: {
+        user_id: String(d.user_id || d.user?.id || d.id || ''),
+        full_name: d.user?.full_name || d.full_name || '',
+        phone: d.user?.phone || d.phone || '',
+        email: d.user?.email || payload.email,
+        token: d.token || '',
+        onboarding_complete: d.onboarding_complete ?? false,
+      },
+    };
 
-  if (normalized.data.token) {
-    localStorage.setItem('token', normalized.data.token);
-  }
-  if (normalized.data.user_id) {
-    localStorage.setItem('userId', normalized.data.user_id);
-  }
+    if (normalized.data.token) {
+      localStorage.setItem('token', normalized.data.token);
+    }
+    if (normalized.data.user_id) {
+      localStorage.setItem('userId', normalized.data.user_id);
+    }
 
-  return normalized;
-},
+    return normalized;
+  },
 
 
   getCurrentUser: async (): Promise<{ status: boolean; message: string; data: UserData }> => {
