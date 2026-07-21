@@ -31,28 +31,34 @@ async function createEscrow(req, res, next) {
     const pin = generatePIN();
     const orderReference = `${paymentCode}-${Date.now()}`;
 
-    // Create real Nomba virtual account for this escrow
+    // Create Nomba virtual account (optional — escrow works without it)
     let virtualAccountData = null;
     try {
       const accountRef = `ESC-${paymentCode}-${Date.now()}`;
       virtualAccountData = await NombaService.createVirtualAccount({
         accountRef,
-        accountName: `AjoBI Escrow - ${description.substring(0, 20)}`,
+        accountName: `AjoBI Escrow`,
         bvn: user.bvn || '00000000000',
         currency: 'NGN',
       });
     } catch (vaErr) {
-      console.error('Virtual account creation failed:', vaErr.message);
+      console.warn('Virtual account creation skipped:', vaErr.message);
     }
 
-    // Also create Nomba checkout link as backup payment method
-    const checkout = await NombaService.createCheckoutOrder({
-      amount: parseFloat(amount),
-      customerEmail: recipient_email || user.email,
-      orderReference,
-      customerId: String(req.user.id),
-      narration: `Escrow: ${description}`,
-    });
+    // Create Nomba checkout link (optional — escrow works without it)
+    let checkoutLink = null;
+    try {
+      const checkout = await NombaService.createCheckoutOrder({
+        amount: parseFloat(amount),
+        customerEmail: recipient_email || user.email,
+        orderReference,
+        customerId: String(req.user.id),
+        narration: `Escrow: ${description}`,
+      });
+      checkoutLink = checkout.checkoutLink;
+    } catch (checkoutErr) {
+      console.warn('Checkout creation skipped:', checkoutErr.message);
+    }
 
     let recipientUserId = null;
     if (recipient_email) {
@@ -65,16 +71,9 @@ async function createEscrow(req, res, next) {
       }
     }
 
-    // Store virtual account in DB
-    let vaAccountNumber = null;
-    let vaAccountName = null;
-    let vaBankName = null;
-    if (virtualAccountData) {
-      vaAccountNumber = virtualAccountData.bankAccountNumber || virtualAccountData.accountNumber;
-      vaAccountName = virtualAccountData.accountName;
-      vaBankName = virtualAccountData.bankName || 'Nomba MFB';
-    }
-
+    const vaAccountNumber = virtualAccountData?.bankAccountNumber || virtualAccountData?.accountNumber || null;
+    const vaAccountName = virtualAccountData?.accountName || null;
+    const vaBankName = virtualAccountData?.bankName || 'Nomba MFB';
     const result = await pool.query(
       `INSERT INTO escrows
          (creator_user_id, recipient_user_id, amount, description,
@@ -84,26 +83,26 @@ async function createEscrow(req, res, next) {
        RETURNING *`,
       [
         req.user.id, recipientUserId, amount, description,
-        paymentCode, checkout.checkoutLink, orderReference, pin,
+        paymentCode, checkoutLink, orderReference, pin,
       ]
     );
 
     const escrow = result.rows[0];
 
-    return success(res, {
+  return success(res, {
       escrow,
-      checkout_link: checkout.checkoutLink,
+      checkout_link: checkoutLink,
       payment_link: `${process.env.FRONTEND_URL}/pay/${paymentCode}`,
-      virtual_account: virtualAccountData ? {
+      virtual_account: vaAccountNumber ? {
         account_number: vaAccountNumber,
         account_name: vaAccountName,
         bank_name: vaBankName,
-        note: 'Transfer exact amount to this account. Payment will be confirmed automatically.',
+        note: 'Transfer exact amount to this account. Payment confirmed automatically.',
       } : null,
       pin,
-      pin_note: 'Share this PIN privately with the payer. They need it to confirm payment on the pay page.',
-      share_message: `You have been requested to pay ₦${amount} for "${description}". Pay here: ${process.env.FRONTEND_URL}/pay/${paymentCode} — You will need the PIN which will be shared with you separately.`,
-    }, 'Escrow created successfully', 201);
+      pin_note: 'Share this PIN privately with the payer. They need it to verify payment on the pay page.',
+      share_message: `You have been requested to pay ₦${amount} for "${description}". Pay here: ${process.env.FRONTEND_URL}/pay/${paymentCode} — Ask for the PIN separately.`,
+    }, 'Escrow created successfully', 201);;
   } catch (err) {
     next(err);
   }
