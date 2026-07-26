@@ -1,22 +1,19 @@
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useAppSelector } from '@/store';
-import { escrowService, CreateEscrowPayload } from '@/services/escrowService';
+import { escrowService } from '@/services/escrowService';
 
 export const useCreateEscrow = () => {
-  const router = useRouter();
   const user = useAppSelector((state) => state.auth.user);
   const userId = user?.user_id || (typeof window !== 'undefined' ? localStorage.getItem('userId') : null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [created, setCreated] = useState<any>(null); // holds the full response after creation
 
-  const [formData, setFormData] = useState<Omit<CreateEscrowPayload, 'creator_id'>>({
-    type: 'Purchase',
-    counterparty_id: '',
+  const [formData, setFormData] = useState({
     amount: 0,
     description: '',
-    expected_completion_date: '',
-    listing_id: ''
+    recipient_email: '',
+    recipient_phone: '',
   });
 
   const updateField = (field: string, value: any) => {
@@ -25,34 +22,35 @@ export const useCreateEscrow = () => {
 
   const handleSubmit = async () => {
     if (!userId) return;
+    if (!formData.amount || !formData.description) {
+      setError('Amount and description are required');
+      return;
+    }
     setIsLoading(true);
     setError(null);
     try {
-      const payload: CreateEscrowPayload = {
-        ...formData,
-        creator_id: userId
-      };
-      
-      const response = await escrowService.createEscrow(payload);
-      
-      if (response.status && response.data?.escrow_id) {
-        // Automatically generate escrow virtual account immediately after creation
-        try {
-          await escrowService.generateVirtualAccount(response.data.escrow_id);
-          console.log('Escrow virtual account generated successfully');
-        } catch (vaError) {
-          console.error('Failed to generate escrow virtual account', vaError);
-        }
-        
-        // Redirect to the new escrow details or list
-        router.push('/dashboard/escrow');
+      const response = await escrowService.createEscrow({
+        amount: formData.amount,
+        description: formData.description,
+        recipient_email: formData.recipient_email || undefined,
+        recipient_phone: formData.recipient_phone || undefined,
+      });
+
+      if (response.status && response.data) {
+        setCreated(response.data);
+      } else {
+        setError(response.message || 'Failed to create escrow');
       }
     } catch (err: any) {
-      console.error('Escrow creation failed', err);
       setError(err.message || 'Failed to create escrow');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const reset = () => {
+    setCreated(null);
+    setFormData({ amount: 0, description: '', recipient_email: '', recipient_phone: '' });
   };
 
   return {
@@ -60,6 +58,8 @@ export const useCreateEscrow = () => {
     updateField,
     isLoading,
     error,
-    handleSubmit
+    handleSubmit,
+    created,
+    reset,
   };
 };
