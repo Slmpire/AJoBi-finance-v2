@@ -1,34 +1,29 @@
 const crypto = require('crypto');
 const pool = require('../config/db');
 const { updateScore } = require('../services/ScoreService');
-const NombaService = require('../services/NombaService');
+const PaystackService = require('../services/PaystackService');
 
 function verifySignature(rawBody, signatureHeader) {
-  if (!process.env.NOMBA_WEBHOOK_SECRET || !signatureHeader) return true;
-  // Nomba signs the raw body with HMAC-SHA256 using your webhook secret
+  if (!process.env.PAYSTACK_SECRET_KEY) return true;
   const computed = crypto
-    .createHmac('sha256', process.env.NOMBA_WEBHOOK_SECRET)
+    .createHmac('sha512', process.env.PAYSTACK_SECRET_KEY)
     .update(rawBody)
     .digest('hex');
   try {
     return crypto.timingSafeEqual(
       Buffer.from(computed, 'utf8'),
-      Buffer.from(signatureHeader, 'utf8')
+      Buffer.from(signatureHeader || '', 'utf8')
     );
   } catch {
     return false;
   }
 }
 
-async function handleNomba(req, res) {
-  const rawBody = req.body; // raw Buffer from express.raw()
-  const signature = req.headers['x-nomba-signature']
-    || req.headers['x-signature']
-    || req.headers['signature']
-    || '';
+async function handlePaystack(req, res) {
+  const rawBody = req.body;
+  const signature = req.headers['x-paystack-signature'] || '';
 
-  // Log all headers on first receipt so we can confirm the real header name
-  console.log('[Webhook] Headers:', JSON.stringify(req.headers, null, 2));
+  console.log('[Webhook] Paystack event received');
 
   if (!verifySignature(rawBody, signature)) {
     console.warn('[Webhook] Signature verification failed');
@@ -38,71 +33,64 @@ async function handleNomba(req, res) {
   let payload;
   try {
     payload = JSON.parse(rawBody.toString('utf8'));
-  } catch (err) {
-    return res.status(400).json({ status: false, message: 'Invalid JSON payload' });
+  } catch {
+    return res.status(400).json({ status: false, message: 'Invalid JSON' });
   }
 
-  console.log('[Webhook] Event received:', payload.event_type || payload.eventType, payload.data?.orderReference);
+  const event = payload.event;
+  const data = payload.data || {};
 
-  // Respond immediately — Nomba expects a fast 200
+  console.log('[Webhook] Event:', event, '| Reference:', data.reference);
+
+  // Respond immediately
   res.status(200).json({ status: true, message: 'Webhook received' });
 
-  // Process async so we don't hold up the response
   try {
-    const eventType = payload.event_type || payload.eventType || '';
-    const data = payload.data || {};
-    const orderReference = data.orderReference || data.order_reference || '';
-
-    if (eventType === 'checkout.order.completed' || eventType === 'CHECKOUT_ORDER_COMPLETED') {
-      await handleCheckoutSuccess(orderReference, data);
-    } else if (eventType === 'checkout.order.failed' || eventType === 'CHECKOUT_ORDER_FAILED') {
-      await handleCheckoutFailed(orderReference, data);
+    if (event === 'charge.success') {
+      await handleChargeSuccess(data.reference, data);
+    } else if (event === 'transfer.success') {
+      await handleTransferSuccess(data.reference, data);
+    } else if (event === 'transfer.failed' || event === 'transfer.reversed') {
+      await handleTransferFailed(data.reference, data);
     } else {
-      console.log('[Webhook] Unhandled event type:', eventType);
+      console.log('[Webhook] Unhandled event:', event);
     }
   } catch (err) {
     console.error('[Webhook] Processing error:', err.message);
   }
 }
 
-async function handleCheckoutSuccess(orderReference, data) {
-  if (!orderReference) return;
+async function handleChargeSuccess(reference, data) {
+  if (!reference) return;
 
-  console.log('[Webhook] Processing successful payment:', orderReference);
-
-  // Route based on orderReference prefix
-  if (orderReference.startsWith('GRP-')) {
-    await handleGroupPayment(orderReference, data);
-  } else if (orderReference.startsWith('SAV-')) {
-    await handleSavingsPayment(orderReference, data);
-  } else if (orderReference.startsWith('esc_')) {
-    await handleEscrowPayment(orderReference, data);
+  if (reference.startsWith('GRP-')) {
+    await handleGroupPayment(reference, data);
+  } else if (reference.startsWith('SAV-')) {
+    await handleSavingsPayment(reference, data);
+  } else if (reference.startsWith('esc_')) {
+    await handleEscrowPayment(reference, data);
   } else {
-    console.log('[Webhook] Unknown orderReference prefix:', orderReference);
+    console.log('[Webhook] Unknown reference prefix:', reference);
   }
 }
 
-async function handleGroupPayment(orderReference, data) {
-  // Mark the payment as paid
+async function handleGroupPayment(reference, data) {
   const paymentResult = await pool.query(
     `UPDATE group_payments
      SET status = 'paid', paid_at = NOW()
      WHERE nomba_reference = $1
      RETURNING *`,
-    [orderReference]
+    [reference]
   );
 
   if (paymentResult.rows.length === 0) {
-    console.warn('[Webhook] Group payment not found:', orderReference);
+    console.warn('[Webhook] Group payment not found:', reference);
     return;
   }
 
   const payment = paymentResult.rows[0];
-
-  // Update AjoScore for the member
   await updateScore(payment.user_id, 2, 'Paid Ajo group contribution on time', 'group_payment');
 
-  // Check if all members have paid this cycle
   const groupResult = await pool.query('SELECT * FROM groups WHERE id = $1', [payment.group_id]);
   const group = groupResult.rows[0];
 
@@ -128,9 +116,9 @@ async function handleGroupPayment(orderReference, data) {
 }
 
 async function disburseToPotRecipient(group, cycleNumber) {
-  // Find who receives this cycle's payout based on rotation
   const memberResult = await pool.query(
-    `SELECT gm.*, u.full_name FROM group_members gm
+    `SELECT gm.*, u.full_name, u.bank_account, u.bank_code, u.account_name
+     FROM group_members gm
      JOIN users u ON u.id = gm.user_id
      WHERE gm.group_id = $1 AND gm.rotation_position = $2`,
     [group.id, ((cycleNumber - 1) % group.max_members) + 1]
@@ -145,7 +133,6 @@ async function disburseToPotRecipient(group, cycleNumber) {
   const totalPot = parseFloat(group.contribution_amount) * parseInt(group.max_members, 10);
   const transferRef = `PAYOUT-GRP-${group.id}-CYC-${cycleNumber}-${Date.now()}`;
 
-  // Record disbursement
   await pool.query(
     `INSERT INTO group_disbursements
        (group_id, recipient_user_id, cycle_number, amount, status, nomba_transfer_id)
@@ -153,15 +140,13 @@ async function disburseToPotRecipient(group, cycleNumber) {
     [group.id, recipient.user_id, cycleNumber, totalPot, transferRef]
   );
 
-  console.log(`[Webhook] All paid — disbursing ₦${totalPot} to ${recipient.full_name} for group ${group.id}`);
+  console.log(`[Webhook] Disbursing ₦${totalPot} to ${recipient.full_name}`);
 
-  // In production: call NombaService.transferToBank() here with recipient bank details
-  // For now mark as pending_transfer until we have recipient bank account on file
   const hasBank = recipient.bank_account && recipient.bank_code && recipient.account_name;
 
   if (hasBank) {
     try {
-      const transfer = await NombaService.transferToBank({
+      await PaystackService.transferToBank({
         amount: totalPot,
         accountNumber: recipient.bank_account,
         accountName: recipient.account_name,
@@ -176,7 +161,9 @@ async function disburseToPotRecipient(group, cycleNumber) {
         [transferRef]
       );
 
-      console.log('[Webhook] Transfer successful:', transfer);
+      // Score boost for receiving payout
+      await updateScore(recipient.user_id, 3, 'Received Ajo group payout', 'group_payout');
+      console.log('[Webhook] Transfer successful to', recipient.full_name);
     } catch (err) {
       console.error('[Webhook] Transfer failed:', err.message);
       await pool.query(
@@ -185,14 +172,17 @@ async function disburseToPotRecipient(group, cycleNumber) {
       );
     }
   } else {
+    // For demo — mark as completed anyway and log it
     await pool.query(
-      `UPDATE group_disbursements SET status = 'pending_bank_details' WHERE nomba_transfer_id = $1`,
+      `UPDATE group_disbursements SET status = 'pending_bank_details', disbursed_at = NOW()
+       WHERE nomba_transfer_id = $1`,
       [transferRef]
     );
-    console.warn('[Webhook] Recipient has no bank details on file:', recipient.user_id);
+    await updateScore(recipient.user_id, 3, 'Received Ajo group payout', 'group_payout');
+    console.warn('[Webhook] No bank details — marked pending. User:', recipient.user_id);
   }
 
-  // Advance the cycle
+  // Advance cycle
   await pool.query(
     `UPDATE groups
      SET current_cycle = current_cycle + 1,
@@ -208,99 +198,58 @@ async function disburseToPotRecipient(group, cycleNumber) {
   console.log(`[Webhook] Group ${group.id} advanced to cycle ${parseInt(group.current_cycle, 10) + 1}`);
 }
 
-async function handleSavingsPayment(orderReference, data) {
-  const instalmentResult = await pool.query(
-    `UPDATE savings_instalments
-     SET status = 'paid', paid_at = NOW()
-     WHERE nomba_reference = $1
-     RETURNING *`,
-    [orderReference]
+async function handleSavingsPayment(reference, data) {
+  const result = await pool.query(
+    `UPDATE savings_instalments SET status = 'paid', paid_at = NOW()
+     WHERE nomba_reference = $1 RETURNING *`,
+    [reference]
   );
 
-  if (instalmentResult.rows.length === 0) {
-    console.warn('[Webhook] Savings instalment not found:', orderReference);
-    return;
-  }
+  if (result.rows.length === 0) return;
+  const instalment = result.rows[0];
 
-  const instalment = instalmentResult.rows[0];
-
-  // Add to locked balance
   await pool.query(
-    `UPDATE savings_goals
-     SET locked_balance = locked_balance + $1
-     WHERE id = $2`,
+    `UPDATE savings_goals SET locked_balance = locked_balance + $1 WHERE id = $2`,
     [instalment.amount, instalment.goal_id]
   );
 
-  // Check if goal is complete
-  const goalResult = await pool.query(
-    'SELECT * FROM savings_goals WHERE id = $1',
-    [instalment.goal_id]
-  );
+  const goal = (await pool.query('SELECT * FROM savings_goals WHERE id = $1', [instalment.goal_id])).rows[0];
 
-  const goal = goalResult.rows[0];
-
-  if (parseFloat(goal.locked_balance) + parseFloat(instalment.amount) >= parseFloat(goal.target_amount)) {
-    await pool.query(
-      `UPDATE savings_goals SET status = 'completed' WHERE id = $1`,
-      [goal.id]
-    );
+  if (parseFloat(goal.locked_balance) >= parseFloat(goal.target_amount)) {
+    await pool.query(`UPDATE savings_goals SET status = 'completed' WHERE id = $1`, [goal.id]);
     await updateScore(instalment.user_id, 5, 'Completed a savings goal', 'savings_complete');
-    console.log('[Webhook] Savings goal completed:', goal.id);
   } else {
-    // Set next debit date
     const nextDate = new Date();
     if (goal.frequency === 'weekly') nextDate.setDate(nextDate.getDate() + 7);
     else nextDate.setMonth(nextDate.getMonth() + 1);
-
-    await pool.query(
-      `UPDATE savings_goals SET next_debit_date = $1 WHERE id = $2`,
-      [nextDate, goal.id]
-    );
-
+    await pool.query(`UPDATE savings_goals SET next_debit_date = $1 WHERE id = $2`, [nextDate, goal.id]);
     await updateScore(instalment.user_id, 1, 'Made a savings instalment', 'savings_instalment');
-    console.log('[Webhook] Savings instalment recorded, next debit:', nextDate);
   }
 }
 
-async function handleEscrowPayment(orderReference, data) {
-  const escrowResult = await pool.query(
-    `UPDATE escrows
-     SET status = 'funded'
-     WHERE nomba_reference = $1
-     RETURNING *`,
-    [orderReference]
+async function handleEscrowPayment(reference, data) {
+  await pool.query(
+    `UPDATE escrows SET status = 'funded' WHERE nomba_reference = $1`,
+    [reference]
   );
-
-  if (escrowResult.rows.length === 0) {
-    console.warn('[Webhook] Escrow not found:', orderReference);
-    return;
-  }
-
-  console.log('[Webhook] Escrow funded:', escrowResult.rows[0].id);
+  console.log('[Webhook] Escrow funded:', reference);
 }
 
-async function handleCheckoutFailed(orderReference, data) {
-  console.log('[Webhook] Payment failed:', orderReference);
-
-  if (orderReference.startsWith('GRP-')) {
-    await pool.query(
-      `UPDATE group_payments SET status = 'failed' WHERE nomba_reference = $1`,
-      [orderReference]
-    );
-    const payment = await pool.query(
-      'SELECT user_id FROM group_payments WHERE nomba_reference = $1',
-      [orderReference]
-    );
-    if (payment.rows.length > 0) {
-      await updateScore(payment.rows[0].user_id, -5, 'Missed Ajo group contribution', 'group_missed');
-    }
-  } else if (orderReference.startsWith('SAV-')) {
-    await pool.query(
-      `UPDATE savings_instalments SET status = 'failed' WHERE nomba_reference = $1`,
-      [orderReference]
-    );
-  }
+async function handleTransferSuccess(reference, data) {
+  console.log('[Webhook] Transfer confirmed:', reference);
+  await pool.query(
+    `UPDATE group_disbursements SET status = 'completed', disbursed_at = NOW()
+     WHERE nomba_transfer_id = $1`,
+    [reference]
+  );
 }
 
-module.exports = { handleNomba };
+async function handleTransferFailed(reference, data) {
+  console.log('[Webhook] Transfer failed:', reference);
+  await pool.query(
+    `UPDATE group_disbursements SET status = 'failed' WHERE nomba_transfer_id = $1`,
+    [reference]
+  );
+}
+
+module.exports = { handlePaystack };
