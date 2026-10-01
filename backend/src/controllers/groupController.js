@@ -1,6 +1,6 @@
 const pool = require('../config/db');
 const { success, fail } = require('../utils/response');
-const NombaService = require('../services/NombaService');
+const PaystackService = require('../services/PaystackService');
 const { updateScore } = require('../services/ScoreService');
 
 function generateInviteCode() {
@@ -237,7 +237,7 @@ async function setupDebit(req, res, next) {
 
     const orderReference = `GRP-${group.id}-USR-${req.user.id}-CYC-${group.current_cycle}-${Date.now()}`;
 
-    const checkout = await NombaService.createCheckoutOrder({
+    const checkout = await PaystackService.createCheckoutOrder({
       amount: parseFloat(group.contribution_amount),
       customerEmail: user.email,
       orderReference,

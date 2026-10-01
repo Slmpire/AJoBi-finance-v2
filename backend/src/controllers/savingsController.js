@@ -1,6 +1,6 @@
 const pool = require('../config/db');
 const { success, fail } = require('../utils/response');
-const NombaService = require('../services/NombaService');
+const PaystackService = require('../services/PaystackService');
 const { updateScore } = require('../services/ScoreService');
 
 async function createGoal(req, res, next) {
@@ -82,7 +82,7 @@ async function setupGoalPayment(req, res, next) {
 
     const orderReference = `SAV-${goal.id}-USR-${req.user.id}-${Date.now()}`;
 
-    const checkout = await NombaService.createCheckoutOrder({
+    const checkout = await PaystackService.createCheckoutOrder({
       amount: parseFloat(goal.instalment_amount),
       customerEmail: user.email,
       orderReference,

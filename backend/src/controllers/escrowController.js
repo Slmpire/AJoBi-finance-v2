@@ -1,6 +1,6 @@
 const pool = require('../config/db');
 const { success, fail } = require('../utils/response');
-const NombaService = require('../services/NombaService');
+const PaystackService = require('../services/PaystackService');
 const { updateScore } = require('../services/ScoreService');
 const bcrypt = require('bcrypt');
 
@@ -35,7 +35,7 @@ async function createEscrow(req, res, next) {
     let virtualAccountData = null;
     try {
       const accountRef = `ESC-${paymentCode}-${Date.now()}`;
-      virtualAccountData = await NombaService.createVirtualAccount({
+      virtualAccountData = await PaystackService.createVirtualAccount({
         accountRef,
         accountName: `AjoBI Escrow`,
         bvn: user.bvn || '00000000000',
@@ -48,7 +48,7 @@ async function createEscrow(req, res, next) {
     // Create Nomba checkout link (optional — escrow works without it)
     let checkoutLink = null;
     try {
-      const checkout = await NombaService.createCheckoutOrder({
+      const checkout = await PaystackService.createCheckoutOrder({
         amount: parseFloat(amount),
         customerEmail: recipient_email || user.email,
         orderReference,
@@ -361,7 +361,7 @@ async function generateVirtualAccount(req, res, next) {
 
     const accountRef = `ESC-${escrow.payment_code}-${Date.now()}`;
 
-    const account = await NombaService.createVirtualAccount({
+    const account = await PaystackService.createVirtualAccount({
       accountRef,
       accountName: `AjoBI Escrow - ${escrow.description?.substring(0, 20) || 'Payment'}`,
       bvn: user.bvn || '00000000000',

@@ -178,8 +178,8 @@ async function createVirtualAccount(req, res, next) {
 
     const accountRef = `AJOBI-USR-${req.user.id}-${Date.now()}`;
 
-    const NombaService = require('../services/NombaService');
-    const account = await NombaService.createVirtualAccount({
+    const PaystackService = require('../services/PaystackService');
+    const account = await PaystackService.createVirtualAccount({
       accountRef,
       accountName: user.full_name,
       bvn: user.bvn || '00000000000',
