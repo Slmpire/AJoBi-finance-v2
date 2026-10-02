@@ -13,6 +13,7 @@ const {
   browseGroups,
   matchGroup,
   simulatePayout,
+  getGroupWallet,
 } = require('../controllers/groupController');
 
 router.get('/banks', auth, listBankCodes);
@@ -26,5 +27,7 @@ router.get('/:id/members', auth, getGroupMembers);
 router.get('/:id/payments', auth, getGroupPayments);
 router.post('/:id/setup-debit', auth, setupDebit);
 router.post('/:id/simulate-payout', auth, simulatePayout);
+
+router.get('/:id/wallet', auth, getGroupWallet);
 
 module.exports = router;
