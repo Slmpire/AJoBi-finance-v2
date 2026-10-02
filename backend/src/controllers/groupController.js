@@ -108,6 +108,15 @@ async function joinGroup(req, res, next) {
       [group.id, req.user.id, currentCount + 1]
     );
 
+    // Auto-activate when group reaches max members
+    const newCount = currentCount + 1;
+    if (newCount >= group.max_members) {
+      await pool.query(
+        `UPDATE groups SET status = 'active' WHERE id = $1`,
+        [group.id]
+      );
+    }
+
     return success(res, group, 'Joined group successfully');
   } catch (err) {
     next(err);
@@ -282,7 +291,7 @@ async function browseGroups(req, res, next) {
         u.full_name as creator_name
       FROM groups g
       JOIN users u ON u.id = g.created_by
-      WHERE g.status = 'active'
+      WHERE g.status IN ('active', 'pending')
         AND (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) < g.max_members
         AND g.created_by != $1
     `;
@@ -373,6 +382,13 @@ async function simulatePayout(req, res, next) {
     const recipientPosition = ((group.current_cycle - 1) % members.rows.length) + 1;
     const recipient = members.rows.find(m => m.rotation_position === recipientPosition);
     const totalPot = parseFloat(group.contribution_amount) * members.rows.length;
+
+    // Score bonus for recipient
+    if (recipient) {
+      await require('../services/ScoreService').updateScore(
+        recipient.user_id, 3, 'Received Ajo group payout', 'group_payout'
+      );
+    }
 
     // Record disbursement
     const transferRef = `PAYOUT-GRP-${id}-CYC-${group.current_cycle}-SIM`;
