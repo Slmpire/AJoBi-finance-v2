@@ -431,7 +431,89 @@ async function simulatePayout(req, res, next) {
   }
 }
 
+
+async function getGroupWallet(req, res, next) {
+  try {
+    const { id } = req.params;
+
+    const memberCheck = await pool.query(
+      'SELECT id FROM group_members WHERE group_id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+    if (memberCheck.rows.length === 0) return fail(res, 'Not a member of this group', 403);
+
+    const groupResult = await pool.query('SELECT * FROM groups WHERE id = $1', [id]);
+    if (groupResult.rows.length === 0) return fail(res, 'Group not found', 404);
+    const group = groupResult.rows[0];
+
+    const collected = await pool.query(
+      `SELECT COALESCE(SUM(amount), 0) as total FROM group_payments WHERE group_id = $1 AND status = 'paid'`,
+      [id]
+    );
+
+    const disbursed = await pool.query(
+      `SELECT COALESCE(SUM(amount), 0) as total FROM group_disbursements WHERE group_id = $1 AND status = 'completed'`,
+      [id]
+    );
+
+    const cycleMembers = await pool.query(
+      `SELECT gm.user_id, gm.rotation_position, u.full_name,
+              gp.status as payment_status, gp.paid_at, gp.amount
+       FROM group_members gm
+       JOIN users u ON u.id = gm.user_id
+       LEFT JOIN group_payments gp ON gp.user_id = gm.user_id
+         AND gp.group_id = $1 AND gp.cycle_number = $2
+       WHERE gm.group_id = $1
+       ORDER BY gm.rotation_position`,
+      [id, group.current_cycle]
+    );
+
+    const disbursements = await pool.query(
+      `SELECT gd.*, u.full_name as recipient_name
+       FROM group_disbursements gd
+       JOIN users u ON u.id = gd.recipient_user_id
+       WHERE gd.group_id = $1 ORDER BY gd.disbursed_at DESC`,
+      [id]
+    );
+
+    const paidCount = cycleMembers.rows.filter(m => m.payment_status === 'paid').length;
+    const totalMembers = cycleMembers.rows.length;
+    const potCollected = paidCount * parseFloat(group.contribution_amount);
+    const potTarget = totalMembers * parseFloat(group.contribution_amount);
+
+    return success(res, {
+      group_id: parseInt(id),
+      group_name: group.name,
+      status: group.status,
+      current_cycle: group.current_cycle,
+      frequency: group.frequency,
+      next_collection_date: group.next_collection_date,
+      wallet: {
+        total_collected: parseFloat(collected.rows[0].total),
+        total_disbursed: parseFloat(disbursed.rows[0].total),
+        current_cycle_pot: potCollected,
+        current_cycle_target: potTarget,
+        pot_progress_percent: potTarget > 0 ? Math.round((potCollected / potTarget) * 100) : 0,
+      },
+      current_cycle_members: cycleMembers.rows.map(m => ({
+        user_id: m.user_id,
+        full_name: m.full_name,
+        rotation_position: m.rotation_position,
+        paid: m.payment_status === 'paid',
+        paid_at: m.paid_at,
+        amount: m.amount || group.contribution_amount,
+      })),
+      disbursement_history: disbursements.rows,
+      last_updated: new Date().toISOString(),
+    }, 'Group wallet fetched successfully');
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
+  getGroupWallet,
+  getGroupWallet,
   createGroup,
   joinGroup,
   getMyGroups,
@@ -444,3 +526,96 @@ module.exports = {
   matchGroup,
   simulatePayout,
 };
+async function getGroupWallet(req, res, next) {
+  try {
+    const { id } = req.params;
+
+    // Verify member access
+    const memberCheck = await pool.query(
+      'SELECT id FROM group_members WHERE group_id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+    if (memberCheck.rows.length === 0) {
+      return fail(res, 'You are not a member of this group', 403);
+    }
+
+    const groupResult = await pool.query('SELECT * FROM groups WHERE id = $1', [id]);
+    if (groupResult.rows.length === 0) return fail(res, 'Group not found', 404);
+    const group = groupResult.rows[0];
+
+    // Total collected across all cycles
+    const collectedResult = await pool.query(
+      `SELECT COALESCE(SUM(amount), 0) as total
+       FROM group_payments WHERE group_id = $1 AND status = 'paid'`,
+      [id]
+    );
+
+    // Total disbursed
+    const disbursedResult = await pool.query(
+      `SELECT COALESCE(SUM(amount), 0) as total
+       FROM group_disbursements WHERE group_id = $1 AND status = 'completed'`,
+      [id]
+    );
+
+    // Current cycle payments — who paid, who hasn't
+    const currentCyclePayments = await pool.query(
+      `SELECT gm.user_id, gm.rotation_position, u.full_name,
+              gp.status as payment_status, gp.paid_at, gp.amount,
+              gp.nomba_reference as payment_reference
+       FROM group_members gm
+       JOIN users u ON u.id = gm.user_id
+       LEFT JOIN group_payments gp ON gp.user_id = gm.user_id
+         AND gp.group_id = $1 AND gp.cycle_number = $2
+       WHERE gm.group_id = $1
+       ORDER BY gm.rotation_position`,
+      [id, group.current_cycle]
+    );
+
+    // Disbursement history
+    const disbursements = await pool.query(
+      `SELECT gd.*, u.full_name as recipient_name
+       FROM group_disbursements gd
+       JOIN users u ON u.id = gd.recipient_user_id
+       WHERE gd.group_id = $1
+       ORDER BY gd.disbursed_at DESC`,
+      [id]
+    );
+
+    // Current cycle pot progress
+    const paidThisCycle = currentCyclePayments.rows.filter(
+      m => m.payment_status === 'paid'
+    ).length;
+    const totalMembers = currentCyclePayments.rows.length;
+    const potCollected = paidThisCycle * parseFloat(group.contribution_amount);
+    const potTarget = totalMembers * parseFloat(group.contribution_amount);
+
+    return success(res, {
+      group_id: parseInt(id),
+      group_name: group.name,
+      status: group.status,
+      current_cycle: group.current_cycle,
+      frequency: group.frequency,
+      next_collection_date: group.next_collection_date,
+      wallet: {
+        total_collected: parseFloat(collectedResult.rows[0].total),
+        total_disbursed: parseFloat(disbursedResult.rows[0].total),
+        current_cycle_pot: potCollected,
+        current_cycle_target: potTarget,
+        pot_progress_percent: potTarget > 0
+          ? Math.round((potCollected / potTarget) * 100) : 0,
+      },
+      current_cycle_members: currentCyclePayments.rows.map(m => ({
+        user_id: m.user_id,
+        full_name: m.full_name,
+        rotation_position: m.rotation_position,
+        paid: m.payment_status === 'paid',
+        paid_at: m.paid_at,
+        amount: m.amount || group.contribution_amount,
+      })),
+      disbursement_history: disbursements.rows,
+      last_updated: new Date().toISOString(),
+    }, 'Group wallet fetched successfully');
+  } catch (err) {
+    next(err);
+  }
+}
